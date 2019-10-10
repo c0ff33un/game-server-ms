@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"encoding/json"
 
-	"github.com/sa-game-server/src/protocol"
+	"github.com/coff33un/game-server-ms/src/protocol"
 )
 
 var addr = flag.String("addr", ":8080", "http service address")

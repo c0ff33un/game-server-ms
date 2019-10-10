@@ -4,15 +4,18 @@ import (
   "fmt"
 
   "github.com/segmentio/ksuid"
+  "github.com/coff33un/game-server-ms/src/game"
 )
 
 type Room struct {
   ID string `json: "id"`
   hub *Hub
+  game *game.Game
   clients map[*Client]bool
   register chan *Client
   unregister chan *Client
   broadcast chan []byte
+
 }
 
 func NewRoom(h *Hub) *Room {
@@ -27,6 +30,17 @@ func NewRoom(h *Hub) *Room {
   }
   room.hub.register <- room
   return room
+}
+
+func (r *Room) closeRoom() {
+  r.hub.unregister <- r
+  close(r.register)
+  close(r.unregister)
+  close(r.broadcast)
+  for client := range r.clients {
+    close(client.send)
+    delete(r.clients, client)
+  }
 }
 
 func (r *Room) Run() {
