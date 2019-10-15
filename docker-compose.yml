@@ -1,0 +1,16 @@
+version: '3'
+services:
+  game-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URL: mongo
+  mongo:
+    image: mongo:4.2.0-bionic
+    ports:
+      - "27017:27017"
