@@ -5,12 +5,11 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     ports:
-      - "5000:5000"
-    depends_on:
-      - mongo
+      - "8080:8080"
     environment:
-      MONGO_URL: mongo
-  mongo:
+      MONGO_URL: game-server-db
+      PROD: 1
+  game-server-db:
     image: mongo:4.2.0-bionic
     ports:
       - "27017:27017"
