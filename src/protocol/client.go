@@ -5,10 +5,12 @@
 package protocol
 
 import (
-	"bytes"
+	//"bytes"
 	"log"
 	"time"
 	"fmt"
+	"io"
+	"encoding/json"
 
 	"github.com/gorilla/websocket"
 )
@@ -36,11 +38,32 @@ var (
 type Client struct {
 	room *Room
 
+	// user ID
+	id string
+
 	// The websocket connection.
 	conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
-	send chan []byte
+	send chan interface{}
+}
+
+func printJSON(m map[string]interface{}) {
+  for k, v := range m {
+    switch vv := v.(type) {
+      case string:
+          fmt.Println(k, "is string", vv)
+      case float64:
+          fmt.Println(k, "is float64", vv)
+      case []interface{}:
+          fmt.Println(k, "is an array:")
+          for i, u := range vv {
+              fmt.Println(i, u)
+          }
+      default:
+          fmt.Println(k, "is of a type I don't know how to handle")
+    }
+  }
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -57,17 +80,38 @@ func (c *Client) ReadPump() {
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		_, message, err := c.conn.ReadMessage()
+	  var v interface{}
+		err := c.conn.ReadJSON(&v)
 		if err != nil {
-		  fmt.Println("Error")
+		  fmt.Println("Error", err)
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v", err)
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		c.room.broadcast <- message
+		m := v.(map[string]interface{})
+    printJSON(m)
+    // Server accepts WebSocket connection but needs id and/or authentication to continue with requests
+    if c.id == "" {
+      if m["id"] != "" {
+        c.id = m["id"].(string)
+      }
+    } else {
+      m["id"] = c.id // Backend keeps the Clients IDs not Frontend
+      switch m["type"] {
+        case "message":
+          fmt.Println("Broadcasting Message:")
+          c.room.broadcast <- interface{}(m)
+        case "move":
+          c.room.game.Update <- interface{}(m)
+      }
+    }
 	}
+}
+
+func writeJSON(w io.WriteCloser, v interface{}) error {
+  err := json.NewEncoder(w).Encode(v)
+  return err
 }
 
 // writePump pumps messages from the hub to the websocket connection.
@@ -95,13 +139,12 @@ func (c *Client) WritePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			writeJSON(w, message)
 
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				w.Write(newline)
-				w.Write(<-c.send)
+				writeJSON(w, <-c.send)
 			}
 
 			if err := w.Close(); err != nil {

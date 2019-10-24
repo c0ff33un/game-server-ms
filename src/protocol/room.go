@@ -2,20 +2,35 @@ package protocol
 
 import (
   "fmt"
+  //"context"
+  //"time"
 
   "github.com/segmentio/ksuid"
   "github.com/coff33un/game-server-ms/src/game"
+  //"go.mongodb.org/mongo-driver/bson"
+  //"go.mongodb.org/mongo-driver/mongo/options"
+  //"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type Room struct {
   ID string `json: "id"`
-  hub *Hub
-  game *game.Game
-  clients map[*Client]bool
-  register chan *Client
-  unregister chan *Client
-  broadcast chan []byte
+  hub *Hub `json: "-"`
+  game *game.Game `json: "-"`
 
+  Ready bool `json: "ready"`
+  Setup bool `json: "setup"`
+
+  clients map[*Client]bool `json: "-"`
+
+  register chan *Client `json: "-"`
+  unregister chan *Client `json: "-"`
+  broadcast chan interface{} `json: "-"`
+}
+
+func (r *Room) SetupGame(rows, cols int) {
+  r.game = game.NewGame(rows, cols, r.broadcast)
+  r.Setup = true
+  r.Ready = true
 }
 
 func NewRoom(h *Hub) *Room {
@@ -26,10 +41,26 @@ func NewRoom(h *Hub) *Room {
     clients: make(map[*Client]bool),
     register: make(chan *Client),
     unregister: make(chan *Client),
-    broadcast: make(chan []byte),
+    broadcast: make(chan interface{}),
   }
   room.hub.register <- room
   return room
+}
+
+func (r *Room) StartGame() {
+  if (r.Ready && r.Setup) {
+    go r.game.Run()
+  }
+}
+
+func (r *Room) writeRoomInfo() {
+  /*db := r.hub.db
+  ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+  err := db.Ping(ctx, readpref.Primary())
+  collection := client.Database("taurus").Collection("rooms")
+
+  ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+  res, err := collection.InsertOne(ctx, bson.D())*/
 }
 
 func (r *Room) closeRoom() {
@@ -66,3 +97,4 @@ func (r *Room) Run() {
     }
   }
 }
+
