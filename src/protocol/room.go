@@ -28,7 +28,9 @@ type Room struct {
 }
 
 func (r *Room) SetupGame(rows, cols int) {
-  r.game = game.NewGame(rows, cols)
+  r.game = game.NewGame(rows, cols, r.broadcast)
+  r.Setup = true
+  r.Ready = true
 }
 
 func NewRoom(h *Hub) *Room {
@@ -43,6 +45,12 @@ func NewRoom(h *Hub) *Room {
   }
   room.hub.register <- room
   return room
+}
+
+func (r *Room) StartGame() {
+  if (r.Ready && r.Setup) {
+    go r.game.Run()
+  }
 }
 
 func (r *Room) writeRoomInfo() {

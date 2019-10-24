@@ -8,5 +8,6 @@ import (
 func routes() {
 	http.HandleFunc("/room", handleRooms)
 	http.HandleFunc("/room/setup", hub.SetupRoom)
+	http.HandleFunc("/room/start", hub.StartRoom)
 	http.HandleFunc("/ws", hub.ServeWs)
  }

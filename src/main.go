@@ -38,7 +38,6 @@ func handleRooms(w http.ResponseWriter, r *http.Request) {
     } else {
       http.NotFound(w, r)
     }
-    break;
   case http.MethodPost:
     enableCors(&w)
     room := protocol.NewRoom(hub)
@@ -52,7 +51,6 @@ func handleRooms(w http.ResponseWriter, r *http.Request) {
     fmt.Println("room Run running")
     w.Header().Set("Content-Type", "application/json")
     w.Write(js)
-    break;
   }
 }
 

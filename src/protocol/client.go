@@ -39,7 +39,7 @@ type Client struct {
 	room *Room
 
 	// user ID
-  id string
+	id string
 
 	// The websocket connection.
 	conn *websocket.Conn
@@ -97,9 +97,14 @@ func (c *Client) ReadPump() {
         c.id = m["id"].(string)
       }
     } else {
-      fmt.Println("broadcasting message:")
-      m["id"] = c.id
-      c.room.broadcast <- interface{}(m)
+      m["id"] = c.id // Backend keeps the Clients IDs not Frontend
+      switch m["type"] {
+        case "message":
+          fmt.Println("Broadcasting Message:")
+          c.room.broadcast <- interface{}(m)
+        case "move":
+          c.room.game.Update <- interface{}(m)
+      }
     }
 	}
 }

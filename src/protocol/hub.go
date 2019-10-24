@@ -1,5 +1,7 @@
 package protocol
 
+
+
 import (
   "fmt"
   "log"
@@ -12,6 +14,7 @@ import (
   "encoding/json"
 
   "github.com/gorilla/websocket"
+  "github.com/coff33un/game-server-ms/src/common"
   "go.mongodb.org/mongo-driver/mongo"
   "go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -109,7 +112,6 @@ func (h *Hub) RoomReady(w http.ResponseWriter, r *http.Request) {
       w.WriteHeader(http.StatusAccepted) // Room exists but pending ready
       fmt.Fprintln(w, "Room Not Ready")
     }
-    break
   }
 }
 
@@ -128,19 +130,23 @@ func (h *Hub) SetupReady(w http.ResponseWriter, r *http.Request) {
       w.WriteHeader(http.StatusAccepted) // Room exists but pending ready
       fmt.Fprintln(w, "Room Not Ready")
     }
-    break
   }
 }
 
 type SetupRoomMessage struct {
-  rows int
-  cols int
+  Rows int
+  Cols int
 }
 
 func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
   switch(r.Method) {
+  case http.MethodOptions:
+    common.DisableCors(&w)
+    w.Header().Set("Access-Control-Allow-Methods", "PUT")
+    w.WriteHeader(http.StatusOK)
   case http.MethodPut:
     room, err := h.getRoom404(w, r)
+
     if err != nil {
       log.Println(err)
       return
@@ -152,37 +158,49 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
       log.Println(err)
       return
     }
-    rows, cols := v.rows, v.cols
+    fmt.Println("Setup Room", v)
+    rows, cols := v.Rows, v.Cols
     room.SetupGame(rows, cols)
-    break
+    common.DisableCors(&w)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"id": room.ID})
+  }
+}
+
+func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
+  switch(r.Method) {
+  case http.MethodOptions:
+    common.DisableCors(&w)
+    w.Header().Set("Access-Control-Allow-Methods", "PUT")
+    w.WriteHeader(http.StatusOK)
+  case http.MethodPut:
+    room, err := h.getRoom404(w, r)
+    if err != nil {
+      fmt.Println(err)
+      log.Println(err)
+    }
+    fmt.Println("Start Room")
+    room.StartGame()
   }
 }
 
 
 func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
-  err := r.ParseForm()
+  room, err := h.getRoom404(w, r)
+
   if err != nil {
     log.Println(err)
+    return
   }
-  id := r.Form.Get("id")
   // Room Exists
-  fmt.Println("ServeWS Accessed")
-  if room, ok := h.Byid[id]; ok {
-    fmt.Println("Room exists")
-    conn, err := upgrader.Upgrade(w, r, nil)
-    if err != nil {
-      fmt.Println("Error", err)
-      log.Println(err)
-    }
-    fmt.Println("Here")
-    client := &Client{room: room, id: "", conn: conn, send: make(chan interface{})}
-    fmt.Println("Passes")
-    client.room.register <- client
-    fmt.Println("Registered new client to room")
-    go client.WritePump()
-    go client.ReadPump()
-  } else {
-    fmt.Println("No room found")
-    http.NotFound(w, r)
+  conn, err := upgrader.Upgrade(w, r, nil)
+  if err != nil {
+    fmt.Println("Error", err)
+    log.Println(err)
   }
+  client := &Client{room: room, id: "", conn: conn, send: make(chan interface{})}
+  client.room.register <- client
+  fmt.Println("ServeWS: Registered new client to room")
+  go client.WritePump()
+  go client.ReadPump()
 }
