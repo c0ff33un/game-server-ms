@@ -5,12 +5,20 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     ports:
-      - "5000:5000"
+      - "5001:8080"
     depends_on:
       - mongo
     environment:
       MONGO_URL: mongo
+    networks:
+      - taurus-network
   mongo:
     image: mongo:4.2.0-bionic
     ports:
-      - "27017:27017"
+      - "27018:27018"
+    networks:
+      - taurus-network
+
+networks:
+  taurus-network:
+    external: true
