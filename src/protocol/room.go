@@ -27,12 +27,6 @@ type Room struct {
   broadcast chan interface{} `json: "-"`
 }
 
-func (r *Room) SetupGame(rows, cols int) {
-  r.game = game.NewGame(rows, cols, r.broadcast)
-  r.Setup = true
-  r.Ready = true
-}
-
 func NewRoom(h *Hub) *Room {
   id := ksuid.New().String()
   room := &Room{
@@ -45,6 +39,18 @@ func NewRoom(h *Hub) *Room {
   }
   room.hub.register <- room
   return room
+}
+
+func (r *Room) SetupGame(rows, cols int) {
+  fmt.Println("Setting up game.")
+  var players []string
+  for player := range r.clients {
+    players = append(players, player.ID)
+  }
+  fmt.Println(players)
+  r.game = game.NewGame(rows, cols, r.broadcast, players)
+  r.Setup = true
+  r.Ready = true
 }
 
 func (r *Room) StartGame() {

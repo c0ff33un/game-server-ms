@@ -159,8 +159,13 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
       return
     }
     fmt.Println("Setup Room", v)
+
     rows, cols := v.Rows, v.Cols
     room.SetupGame(rows, cols)
+    // Enqueue Players World Update in game update channel
+    /* for player := v.players {
+      room.game.Update <- player
+    } */
     common.DisableCors(&w)
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string]string{"id": room.ID})
@@ -181,6 +186,10 @@ func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
     }
     fmt.Println("Start Room")
     room.StartGame()
+    common.DisableCors(&w)
+    w.WriteHeader(http.StatusOK)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"id": room.ID})
   }
 }
 
@@ -198,7 +207,7 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
     fmt.Println("Error", err)
     log.Println(err)
   }
-  client := &Client{room: room, id: "", conn: conn, send: make(chan interface{})}
+  client := &Client{room: room, ID: "", conn: conn, send: make(chan interface{})}
   client.room.register <- client
   fmt.Println("ServeWS: Registered new client to room")
   go client.WritePump()

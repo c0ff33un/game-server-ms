@@ -1,5 +1,9 @@
 package game
 
+import(
+  "fmt"
+)
+
 type Player struct {
   x int `json:"x"`
   y int `json:"y"`
@@ -17,9 +21,18 @@ func validPosition(x, y, rows, cols int) bool {
   return between(0, cols - 1, x) && between(0, rows - 1, y)
 }
 
-func (p *Player) move(direction string) map[string]interface{} {
+func NewPlayer(x, y int, game *Game) *Player {
+  return &Player{
+    x : x,
+    y : y,
+    game : game,
+  }
+}
+
+func (p *Player) move(direction string) interface{} {
   x, y := p.x, p.y
   rows, cols := p.game.board.Rows, p.game.board.Cols
+  fmt.Println("direction is", direction)
   switch direction {
   case "up":
     x -= 1
@@ -29,12 +42,15 @@ func (p *Player) move(direction string) map[string]interface{} {
     y -= 1
   case "right":
     y += 1
+  default:
   }
-  var f map[string]interface{}
+  f := make(map[string]interface{})
   if validPosition(x, y, rows, cols) {
     f["x"] = x
     f["y"] = y
-    return f
+    p.x = x
+    p.y = y
+    return interface{}(f)
   }
   return nil
 }

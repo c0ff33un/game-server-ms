@@ -34,12 +34,12 @@ var (
 	space   = []byte{' '}
 )
 
-// Client is a middleman between the websocket connection and the hub.
+// Client is a mIDdleman between the websocket connection and the hub.
 type Client struct {
 	room *Room
 
 	// user ID
-	id string
+	ID string
 
 	// The websocket connection.
 	conn *websocket.Conn
@@ -49,12 +49,15 @@ type Client struct {
 }
 
 func printJSON(m map[string]interface{}) {
+  fmt.Println("JSON:")
   for k, v := range m {
     switch vv := v.(type) {
       case string:
           fmt.Println(k, "is string", vv)
       case float64:
           fmt.Println(k, "is float64", vv)
+      case int:
+          fmt.Println(k, "is int", vv)
       case []interface{}:
           fmt.Println(k, "is an array:")
           for i, u := range vv {
@@ -91,13 +94,15 @@ func (c *Client) ReadPump() {
 		}
 		m := v.(map[string]interface{})
     printJSON(m)
-    // Server accepts WebSocket connection but needs id and/or authentication to continue with requests
-    if c.id == "" {
-      if m["id"] != "" {
-        c.id = m["id"].(string)
+    // Server accepts WebSocket connection but needs ID and/or authentication to continue with requests
+    // Should be subsequent to websocket connection
+    if c.ID == "" {
+      if m["type"] == "connect" && m["ID"] != "" {
+        c.ID = m["id"].(string)
+        c.room.broadcast <- interface{}(m)
       }
     } else {
-      m["id"] = c.id // Backend keeps the Clients IDs not Frontend
+      m["id"] = c.ID // Backend keeps the Clients IDs not Frontend
       switch m["type"] {
         case "message":
           fmt.Println("Broadcasting Message:")
@@ -128,6 +133,7 @@ func (c *Client) WritePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
+			printJSON(message.(map[string]interface{}))
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
@@ -135,7 +141,7 @@ func (c *Client) WritePump() {
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.TextMessage)
+			w, err := c.conn.NextWriter(websocket.TextMessage) // Uses this instead of c.coon.WriteJSON to reuse NextWriter
 			if err != nil {
 				return
 			}
