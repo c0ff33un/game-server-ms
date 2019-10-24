@@ -32,9 +32,9 @@ func NewGame(rows, cols int, broadcast chan interface{}, players []string) *Game
     players : make (map[string]*Player),
   }
 
-  for player := range players {
+  for _, player := range players {
     fmt.Println("create player: ", player)
-    game.players[players[player]] = NewPlayer(rows / 2, cols / 2, game)
+    game.players[player] = NewPlayer(rows / 2, cols / 2, game)
   }
   return game
 }
