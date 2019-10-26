@@ -35,13 +35,13 @@ func (p *Player) move(direction string) interface{} {
   fmt.Println("direction is", direction)
   switch direction {
   case "up":
-    x -= 1
-  case "down":
-    x += 1
-  case "left":
     y -= 1
-  case "right":
+  case "down":
     y += 1
+  case "left":
+    x -= 1
+  case "right":
+    x += 1
   default:
   }
   f := make(map[string]interface{})
