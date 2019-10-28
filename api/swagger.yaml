@@ -3,7 +3,7 @@ swagger: "2.0"
 info:
   description: "This is a game-server it allowss to simulate the game world and communicate world state with clients via websockets."
   version: "0.1.0"
-  title: "M19-GAME-SERVER-MS"
+  title: "taurus-GAME-SERVER-MS"
   contact:
     email: "miaortizma@unal.edu.co"
   license:
@@ -100,6 +100,25 @@ paths:
       security:
       - api_key: []
   /room/setup/{roomId}:
+    get:
+      tags:
+      - "room"
+      summary: "Query wether room is setup"
+      parameters:
+      - name: "roomId"
+        in: "path"
+        description: "ID of room to setup"
+        required: true
+        type: "string"
+        format: "ksuid"
+        x-exportParamName: "roomId"
+      responses:
+        200:
+          description: "Room ready and setup"
+        409:
+          description: "Room not ready"
+      security:
+      - api_key: []
     put:
       tags:
       - "room"
@@ -153,7 +172,7 @@ paths:
         required: true
         type: "string"
         format: "ksuid"
-        x-exportParamName: "roomId"
+        x-xportParamName: "roomId"
       responses:
         200:
           description: "Game started"
@@ -274,5 +293,4 @@ definitions:
       seed:
         type: "integer"
         format: "int64"
-        
-    
+        e

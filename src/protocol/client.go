@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 
 	"github.com/gorilla/websocket"
+	"github.com/coff33un/game-server-ms/src/common"
 )
 
 const (
@@ -48,26 +49,7 @@ type Client struct {
 	send chan interface{}
 }
 
-func printJSON(m map[string]interface{}) {
-  fmt.Println("JSON:")
-  for k, v := range m {
-    switch vv := v.(type) {
-      case string:
-          fmt.Println(k, "is string", vv)
-      case float64:
-          fmt.Println(k, "is float64", vv)
-      case int:
-          fmt.Println(k, "is int", vv)
-      case []interface{}:
-          fmt.Println(k, "is an array:")
-          for i, u := range vv {
-              fmt.Println(i, u)
-          }
-      default:
-          fmt.Println(k, "is of a type I don't know how to handle")
-    }
-  }
-}
+
 
 // readPump pumps messages from the websocket connection to the hub.
 //
@@ -75,7 +57,9 @@ func printJSON(m map[string]interface{}) {
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
 func (c *Client) ReadPump() {
+  fmt.Println("ReadPump Started")
 	defer func() {
+	  fmt.Println("ReadPump Ended")
 		c.room.unregister <- c
 		c.conn.Close()
 	}()
@@ -93,23 +77,16 @@ func (c *Client) ReadPump() {
 			break
 		}
 		m := v.(map[string]interface{})
-    printJSON(m)
-    // Server accepts WebSocket connection but needs ID and/or authentication to continue with requests
-    // Should be subsequent to websocket connection
-    if c.ID == "" {
-      if m["type"] == "connect" && m["ID"] != "" {
-        c.ID = m["id"].(string)
-        c.room.broadcast <- interface{}(m)
-      }
-    } else {
-      m["id"] = c.ID // Backend keeps the Clients IDs not Frontend
-      switch m["type"] {
-        case "message":
-          fmt.Println("Broadcasting Message:")
-          c.room.broadcast <- interface{}(m)
-        case "move":
-          c.room.game.Update <- interface{}(m)
-      }
+    common.PrintJSON(m)
+    m["id"] = c.ID // Backend keeps the Clients IDs not Frontend
+    switch m["type"] {
+    case "connect":
+      c.room.broadcast <- interface{}(m)
+    case "message":
+      fmt.Println("(Push to Channel) Broadcasting Message:", m["text"])
+      c.room.broadcast <- interface{}(m)
+    case "move":
+      c.room.game.Update <- interface{}(m)
     }
 	}
 }
@@ -125,21 +102,24 @@ func writeJSON(w io.WriteCloser, v interface{}) error {
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
 func (c *Client) WritePump() {
+  fmt.Println("WritePump Started")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
+	  fmt.Println("WritePump Ended")
 		ticker.Stop()
 		c.conn.Close()
 	}()
 	for {
 		select {
 		case message, ok := <-c.send:
-			printJSON(message.(map[string]interface{}))
+		  fmt.Println("WritePump Received Function")
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// The hub closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
+        // The hub closed the channel.
+        c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+        return
+      }
+			common.PrintJSON(message.(map[string]interface{}))
 
 			w, err := c.conn.NextWriter(websocket.TextMessage) // Uses this instead of c.coon.WriteJSON to reuse NextWriter
 			if err != nil {

@@ -7,13 +7,13 @@ import (
 type Board struct {
   Rows int `json:"rows"` // grid size
   Cols int `json:"cols"`
-  grid []bool // wall or not
+  Grid []bool // wall or not
   x int
   y int // exit
 }
 
 type Game struct {
-  board *Board
+  Board *Board
   players map[string]*Player
 
   broadcast chan interface{}
@@ -21,12 +21,17 @@ type Game struct {
 }
 
 func NewGame(rows, cols int, broadcast chan interface{}, players []string) *Game {
+  var grid []bool
+  for i := 0; i < rows * cols; i++ {
+    grid = append(grid, false)
+  }
   b := &Board{
     Rows: rows,
     Cols: cols,
+    Grid: grid,
   }
   game := &Game{
-    board : b,
+    Board : b,
     Update : make(chan interface{}),
     broadcast : broadcast,
     players : make (map[string]*Player),
@@ -44,10 +49,6 @@ func (g *Game) updateWorld(f interface{}) {
   switch m["type"].(string) {
   case "move":
     id, direction := m["id"].(string), m["direction"].(string)
-    fmt.Println("here")
-    for player := range g.players {
-      fmt.Println("Player:", player)
-    }
     result := g.players[id].move(direction)
     if result != nil {
       json := result.(map[string]interface{})
@@ -57,7 +58,6 @@ func (g *Game) updateWorld(f interface{}) {
       g.broadcast <- interface{}(json)
     }
   }
-
 }
 
 func (g *Game) Run() {

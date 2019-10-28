@@ -12,9 +12,11 @@ import (
 	"encoding/json"
 
 	"github.com/coff33un/game-server-ms/src/protocol"
+	"github.com/coff33un/game-server-ms/src/common"
+	"github.com/gorilla/mux"
 )
 
-var addr = flag.String("addr", ":8080", "http service address")
+//var addr = flag.String("addr", ":8080", "http service address")
 var hub *protocol.Hub
 
 // ruta para crear room, retorna el id (PseudoRandom) del room creado el room funciona como go rutina
@@ -23,23 +25,31 @@ func enableCors(w *http.ResponseWriter) {
   (*w).Header().Set("Access-Control-Allow-Origin", "*")
 }
 
-func handleRooms(w http.ResponseWriter, r *http.Request) {
+func getRoom(w http.ResponseWriter, r *http.Request) {
+  vars := mux.Vars(r)
+  fmt.Println("here")
+  common.DisableCors(&w)
   switch (r.Method) {
   case http.MethodGet:
-    enableCors(&w)
     err := r.ParseForm()
     if err != nil {
       log.Println(err)
+      return
     }
-    id := r.Form.Get("id")
+    id := vars["roomid"]
     w.Header().Set("Content-Type", "application/json")
     if room, ok := hub.Byid[id]; ok {
       json.NewEncoder(w).Encode(room)
     } else {
       http.NotFound(w, r)
     }
+  }
+}
+
+func createRoom(w http.ResponseWriter, r *http.Request) {
+  common.DisableCors(&w)
+  switch (r.Method) {
   case http.MethodPost:
-    enableCors(&w)
     room := protocol.NewRoom(hub)
     js, err := json.Marshal(map[string]string{"id": room.ID})
     if err != nil {
@@ -60,9 +70,8 @@ func main() {
 	flag.Parse()
 	hub = protocol.NewHub()
 	go hub.Run()
-	routes()
-	err := http.ListenAndServe(*addr, nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
+  err := routes()
+  if err != nil {
+    return
+  }
 }
