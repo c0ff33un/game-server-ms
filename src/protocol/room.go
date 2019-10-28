@@ -46,22 +46,28 @@ func NewRoom(h *Hub) *Room {
   return room
 }
 
-func (r *Room) SetupGame(rows, cols int) {
+func (r *Room) SetupGame(v game.SetupGameMessage) {
   fmt.Println("Setting up game.")
   var players []string
   for player := range r.clients {
     players = append(players, player.ID)
   }
   fmt.Println(players)
-  r.game = game.NewGame(rows, cols, r.broadcast, players)
+  r.game = game.NewGame(v, r.broadcast, players)
   r.Setup = true
   r.Ready = true
 }
 
 func (r *Room) StartGame() {
   if (r.Ready && r.Setup) {
+    r.broadcast <- interface{}(map[string]interface{}{
+      "type": "grid",
+      "grid": r.game.Board.Grid,
+    })
     r.Running = true
     go r.game.Run()
+  } else {
+    fmt.Println("Room Not Setup")
   }
 }
 

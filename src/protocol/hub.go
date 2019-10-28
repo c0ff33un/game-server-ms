@@ -16,7 +16,7 @@ import (
   "strconv"
 
   "github.com/coff33un/game-server-ms/src/common"
-  //"github.com/coff33un/game-server-ms/src/game"
+  "github.com/coff33un/game-server-ms/src/game"
   "github.com/gorilla/websocket"
   "github.com/gorilla/mux"
   "go.mongodb.org/mongo-driver/mongo"
@@ -147,21 +147,6 @@ func (h *Hub) SetupReady(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-type SetupRoomMessage struct {
-  Rows int
-  Cols int
-  Grid []bool
-  Exit struct {
-    X int
-    Y int
-  }
-  Players []struct {
-    X int
-    Y int
-    Id string
-  }
-}
-
 func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
   common.DisableCors(&w)
   fmt.Println("Setup Room")
@@ -171,12 +156,15 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Access-Control-Allow-Methods", "OPTIONS,PUT")
   case http.MethodPut:
     room, err := h.getRoom404(w, r)
-
     if err != nil {
       log.Println(err)
       return
     }
-    var v SetupRoomMessage
+    if room.Running {
+      fmt.Println("Cannot Setup Running Room")
+      return
+    }
+    var v game.SetupGameMessage
     err = json.NewDecoder(r.Body).Decode(&v)
     if err != nil {
       fmt.Println("Error Decoding", err)
@@ -184,9 +172,7 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
       return
     }
     fmt.Println("Setup Room", v)
-
-    rows, cols := v.Rows, v.Cols
-    room.SetupGame(rows, cols)
+    room.SetupGame(v)
     // Enqueue Players World Update in game update channel
     /*for player := v.players {
       room.game.Update <- interface(map[string]interface{
@@ -211,6 +197,10 @@ func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
     if err != nil {
       fmt.Println(err)
       log.Println(err)
+      return
+    }
+    if (room.Running) {
+      fmt.Println("Room already Running")
       return
     }
     fmt.Println("Start Room")

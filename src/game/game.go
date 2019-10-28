@@ -8,38 +8,61 @@ type Board struct {
   Rows int `json:"rows"` // grid size
   Cols int `json:"cols"`
   Grid []bool // wall or not
-  x int
-  y int // exit
+}
+
+type SetupGameMessage struct {
+  Rows int
+  Cols int
+  Grid []bool
+  Exit struct {
+    X int
+    Y int
+  }
+  Begin struct {
+    X int
+    Y int
+  }
+  Players []struct {
+    X int
+    Y int
+    Id string
+  }
 }
 
 type Game struct {
   Board *Board
   players map[string]*Player
-
+  Exit struct {
+    X int
+    Y int
+  }
   broadcast chan interface{}
   Update chan interface{}
 }
 
-func NewGame(rows, cols int, broadcast chan interface{}, players []string) *Game {
-  var grid []bool
-  for i := 0; i < rows * cols; i++ {
-    grid = append(grid, false)
-  }
+func NewGame(v SetupGameMessage, broadcast chan interface{}, players []string) *Game {
   b := &Board{
-    Rows: rows,
-    Cols: cols,
-    Grid: grid,
+    Rows: v.Rows,
+    Cols: v.Cols,
+    Grid: v.Grid,
   }
   game := &Game{
     Board : b,
     Update : make(chan interface{}),
+    Exit: v.Exit,
     broadcast : broadcast,
     players : make (map[string]*Player),
   }
-
+  x, y := v.Begin.Y, v.Begin.X
   for _, player := range players {
     fmt.Println("create player: ", player)
-    game.players[player] = NewPlayer(rows / 2, cols / 2, game)
+    game.players[player] = NewPlayer(x, y, game)
+    /* To-do
+    game.Update <- interface{}(map[string]interface{}{
+      "type": "move",
+      "x": x,
+      "y": y,
+    })*/
   }
   return game
 }
