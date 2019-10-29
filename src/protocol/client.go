@@ -87,6 +87,8 @@ func (c *Client) ReadPump() {
       c.room.broadcast <- interface{}(m)
     case "move":
       c.room.game.Update <- interface{}(m)
+    case "win":
+      c.room.broadcast <- interface{}(m)
     }
 	}
 }

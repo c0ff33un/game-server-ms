@@ -1,1 +1,1 @@
-sudo docker build -t miaortizma/taurus-game-server-ms .
+sudo docker build -t miaortizma/taurus-game-server-ms -f Dockerfile.multistage .

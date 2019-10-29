@@ -256,12 +256,18 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
     return
   }
   token := r.Form.Get("token")
-  f, err := TokenQuery(token)
-  if err != nil {
-    log.Println(err)
-    return
+  var id string
+  if os.Getenv("NO_AUTH") != "" {
+    id = token
+  } else {
+    f, err := TokenQuery(token)
+    if err != nil {
+      log.Println(err)
+      return
+    }
+    id = strconv.Itoa(f.Data.User.Id)
   }
-  id := strconv.Itoa(f.Data.User.Id)
+
   fmt.Println("The id is:", id)
   if room.OkToConnectPlayer(id) {
     conn, err := upgrader.Upgrade(w, r, nil)
