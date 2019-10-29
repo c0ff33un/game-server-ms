@@ -1,9 +1,7 @@
 version: '3'
 services:
-  game-server:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+  taurus-game-server-ms:
+    image: miaortizma/taurus-game-server-ms
     ports:
       - "8888:8080"
     environment:
