@@ -78,6 +78,15 @@ func (g *Game) updateWorld(f interface{}) {
       json["id"] = id
       json["type"] = "move"
       fmt.Println("Valid Move");
+      x, y := json["x"], json["y"]
+      fmt.Println(x == g.Exit.Y, y == g.Exit.X)
+      if x == g.Exit.Y && y == g.Exit.X {
+        fmt.Println("User", id, "won")
+        //g.broadcast <- interface{}(map[string]interface{}{
+        //  "type": "won",
+        //  "id": id,
+        //})
+      }
       g.broadcast <- interface{}(json)
     }
   }

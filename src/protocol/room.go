@@ -142,6 +142,8 @@ func (r *Room) Run() {
       for c := range r.clients {
         fmt.Println("Registered Client:", c.ID)
       }
+      n := len(r.broadcast)
+      fmt.Println("Messages to broadcast:", n)
       for client := range r.clients {
         fmt.Println("Client ID to send message:", client.ID)
         select {
