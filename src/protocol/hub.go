@@ -35,7 +35,7 @@ type Hub struct {
 
 	// Registered Room Games
 	db *mongo.Client
-	rooms map[*Room]bool
+	Rooms map[*Room]bool
   Byid map[string]*Room
 
 	// Registers new rooms.
@@ -65,7 +65,7 @@ func NewHub() *Hub {
 	  db: client,
 		register:   make(chan *Room),
 		unregister: make(chan *Room),
-		rooms:    make(map[*Room]bool),
+		Rooms:    make(map[*Room]bool),
 		Byid: make(map[string]*Room),
 	}
 }
@@ -75,11 +75,11 @@ func (h *Hub) Run() {
 	  fmt.Println("Hub run here")
 		select {
 		case room := <-h.register:
-			h.rooms[room] = true
+			h.Rooms[room] = true
 			h.Byid[room.ID] = room
 		case room := <-h.unregister:
-			if _, ok := h.rooms[room]; ok {
-				delete(h.rooms, room)
+			if _, ok := h.Rooms[room]; ok {
+				delete(h.Rooms, room)
 				delete(h.Byid, room.ID)
 			}
 	  }

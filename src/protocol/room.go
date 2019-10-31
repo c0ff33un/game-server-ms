@@ -4,8 +4,10 @@ import (
   "fmt"
   //"context"
   //"time"
+  "math/rand"
+  "strconv"
 
-  "github.com/segmentio/ksuid"
+  //"github.com/segmentio/ksuid"
   "github.com/coff33un/game-server-ms/src/game"
   "github.com/coff33un/game-server-ms/src/common"
   //"go.mongodb.org/mongo-driver/bson"
@@ -30,8 +32,15 @@ type Room struct {
   broadcast chan interface{} `json: "-"`
 }
 
+func genId() string {
+  return strconv.Itoa(rand.Intn(10000))
+}
+
 func NewRoom(h *Hub) *Room {
-  id := ksuid.New().String()
+  id := genId()
+  for h.Byid[id] != nil {
+    id = genId()
+  }
   room := &Room{
     ID: id,
     hub: h,
