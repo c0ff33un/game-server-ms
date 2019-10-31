@@ -1,7 +1,5 @@
 package protocol
 
-
-
 import (
   "fmt"
   "log"
@@ -173,15 +171,6 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
     }
     fmt.Println("Setup Room", v)
     room.SetupGame(v)
-    // Enqueue Players World Update in game update channel
-    /*for player := v.players {
-      room.game.Update <- interface(map[string]interface{
-        "id": player.id,
-        "type": "move",
-        "x": 0,
-        "y": 0,
-      })
-    }*/
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string]string{"id": room.ID})
   }
@@ -256,9 +245,10 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
     return
   }
   token := r.Form.Get("token")
-  var id string
+  var id, handle string
   if os.Getenv("NO_AUTH") != "" {
     id = token
+    handle = token
   } else {
     f, err := TokenQuery(token)
     if err != nil {
@@ -266,9 +256,11 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
       return
     }
     id = strconv.Itoa(f.Data.User.Id)
+    handle = f.Data.User.Handle
   }
 
   fmt.Println("The id is:", id)
+  fmt.Println("The handle is:", handle)
   if room.OkToConnectPlayer(id) {
     conn, err := upgrader.Upgrade(w, r, nil)
     if err != nil {
@@ -276,10 +268,11 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
       log.Println(err)
       return
     }
-    client := &Client{room: room, ID: id, conn: conn, send: make(chan interface{})}
+    client := &Client{room: room, ID: id, Handle: handle, conn: conn, send: make(chan interface{}, 256)}
     client.room.register <- client
-    fmt.Println("ServeWS: Registered new client to room")
     go client.WritePump()
     go client.ReadPump()
+
+    fmt.Println("ServeWS: Registered new client to room")
   }
 }

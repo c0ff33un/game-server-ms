@@ -29,6 +29,7 @@ type SetupGameMessage struct {
   }
 }
 
+
 type Game struct {
   Board *Board
   players map[string]*Player
@@ -36,8 +37,13 @@ type Game struct {
     X int
     Y int
   }
+  Begin struct {
+    X int
+    Y int
+  }
   broadcast chan interface{}
   Update chan interface{}
+  Close chan bool
 }
 
 func NewGame(v SetupGameMessage, broadcast chan interface{}, players []string) *Game {
@@ -48,21 +54,18 @@ func NewGame(v SetupGameMessage, broadcast chan interface{}, players []string) *
   }
   game := &Game{
     Board : b,
-    Update : make(chan interface{}),
     Exit: v.Exit,
+    Begin: v.Begin,
     broadcast : broadcast,
+    Close : make(chan bool),
     players : make (map[string]*Player),
+    Update : make(chan interface{}),
   }
   x, y := v.Begin.Y, v.Begin.X
   for _, player := range players {
-    fmt.Println("create player: ", player)
+    fmt.Println(player)
     game.players[player] = NewPlayer(x, y, game)
-    /* To-do
-    game.Update <- interface{}(map[string]interface{}{
-      "type": "move",
-      "x": x,
-      "y": y,
-    })*/
+    // To-do
   }
   return game
 }
@@ -77,17 +80,16 @@ func (g *Game) updateWorld(f interface{}) {
       json := result.(map[string]interface{})
       json["id"] = id
       json["type"] = "move"
-      fmt.Println("Valid Move");
       x, y := json["x"], json["y"]
-      fmt.Println(x == g.Exit.Y, y == g.Exit.X)
+      g.broadcast <- interface{}(json)
       if x == g.Exit.Y && y == g.Exit.X {
         fmt.Println("User", id, "won")
-        //g.broadcast <- interface{}(map[string]interface{}{
-        //  "type": "won",
-        //  "id": id,
-        //})
+        g.broadcast <- interface{}(map[string]interface{}{
+          "type": "win",
+          "id": id,
+        })
+        g.Close <- true
       }
-      g.broadcast <- interface{}(json)
     }
   }
 }
@@ -97,7 +99,9 @@ func (g *Game) Run() {
     fmt.Println("Game Run here..")
     select {
     case message := <-g.Update:
-      g.updateWorld(message)
+      if message != nil {
+        g.updateWorld(message)
+      }
     }
   }
 }

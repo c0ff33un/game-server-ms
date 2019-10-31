@@ -1,7 +1,7 @@
 package game
 
 import(
-  "fmt"
+  //"fmt"
 )
 
 type Player struct {
@@ -36,7 +36,6 @@ func NewPlayer(x, y int, game *Game) *Player {
 
 func (p *Player) move(direction string) interface{} {
   x, y := p.x, p.y
-  fmt.Println("direction is", direction)
   switch direction {
   case "up":
     y -= 1

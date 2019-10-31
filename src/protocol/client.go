@@ -13,7 +13,7 @@ import (
 	"encoding/json"
 
 	"github.com/gorilla/websocket"
-	"github.com/coff33un/game-server-ms/src/common"
+	//"github.com/coff33un/game-server-ms/src/common"
 )
 
 const (
@@ -30,11 +30,6 @@ const (
 	maxMessageSize = 512
 )
 
-var (
-	newline = []byte{'\n'}
-	space   = []byte{' '}
-)
-
 // Client is a mIDdleman between the websocket connection and the hub.
 type Client struct {
 	room *Room
@@ -42,14 +37,14 @@ type Client struct {
 	// user ID
 	ID string
 
+	Handle string
+
 	// The websocket connection.
 	conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
 	send chan interface{}
 }
-
-
 
 // readPump pumps messages from the websocket connection to the hub.
 //
@@ -77,18 +72,21 @@ func (c *Client) ReadPump() {
 			break
 		}
 		m := v.(map[string]interface{})
-    common.PrintJSON(m)
+    //common.PrintJSON(m)
     m["id"] = c.ID // Backend keeps the Clients IDs not Frontend
     switch m["type"] {
+    case "win":
+      c.room.StopGame()
+      c.room.broadcast <- interface{}(m)
     case "connect":
+      m["handle"] = c.Handle
       c.room.broadcast <- interface{}(m)
     case "message":
-      fmt.Println("(Push to Channel) Broadcasting Message:", m["text"])
       c.room.broadcast <- interface{}(m)
     case "move":
-      c.room.game.Update <- interface{}(m)
-    case "win":
-      c.room.broadcast <- interface{}(m)
+      if (c.room.Running) {
+        c.room.game.Update <- interface{}(m)
+      }
     }
 	}
 }
@@ -114,14 +112,13 @@ func (c *Client) WritePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-		  fmt.Println("WritePump Received Function")
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
         // The hub closed the channel.
         c.conn.WriteMessage(websocket.CloseMessage, []byte{})
         return
       }
-			common.PrintJSON(message.(map[string]interface{}))
+			//common.PrintJSON(message.(map[string]interface{}))
 
 			w, err := c.conn.NextWriter(websocket.TextMessage) // Uses this instead of c.coon.WriteJSON to reuse NextWriter
 			if err != nil {

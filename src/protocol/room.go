@@ -9,7 +9,7 @@ import (
 
   //"github.com/segmentio/ksuid"
   "github.com/coff33un/game-server-ms/src/game"
-  "github.com/coff33un/game-server-ms/src/common"
+  //"github.com/coff33un/game-server-ms/src/common"
   //"go.mongodb.org/mongo-driver/bson"
   //"go.mongodb.org/mongo-driver/mongo/options"
   //"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -41,6 +41,7 @@ func NewRoom(h *Hub) *Room {
   for h.Byid[id] != nil {
     id = genId()
   }
+  fmt.Println("New RoomID:", id)
   room := &Room{
     ID: id,
     hub: h,
@@ -57,18 +58,28 @@ func NewRoom(h *Hub) *Room {
 
 func (r *Room) SetupGame(v game.SetupGameMessage) {
   fmt.Println("Setting up game.")
+
   var players []string
   for player := range r.clients {
     players = append(players, player.ID)
   }
-  fmt.Println(players)
   r.game = game.NewGame(v, r.broadcast, players)
   r.Setup = true
   r.Ready = true
+  fmt.Println("Room Setup")
 }
 
 func (r *Room) StartGame() {
   if (r.Ready && r.Setup) {
+    for player := range r.clients {
+      x, y := r.game.Begin.X, r.game.Begin.Y
+      r.broadcast <- interface{}(map[string]interface{}{
+        "type": "move",
+        "id": player.ID,
+        "x": y,
+        "y": x,
+      })
+    }
     r.broadcast <- interface{}(map[string]interface{}{
       "type": "grid",
       "grid": r.game.Board.Grid,
@@ -77,6 +88,19 @@ func (r *Room) StartGame() {
     go r.game.Run()
   } else {
     fmt.Println("Room Not Setup")
+  }
+}
+
+func (r *Room) StopGame() {
+  if (!r.Running) {
+    fmt.Println("Cannot Stop A Room that is Not Running")
+  } else {
+    fmt.Println("Try Stop Game")
+    r.Running = false
+    r.Ready = false
+    r.Setup = false
+    close(r.game.Update)
+    fmt.Println("Gracefully Stopped Game")
   }
 }
 
@@ -111,11 +135,14 @@ func (r *Room) playerConnected(id string) bool {
 
 func (r *Room) OkToConnectPlayer(id string) bool {
   if (r.playerConnected(id)) {
+    fmt.Println("User already Connected to Room")
     return false // there can't be two connections of the same user
   }
   if _, ok := r.byid[id]; ok {
+    fmt.Println("User is registrered and Disconnected")
     return true
   }
+  fmt.Println("Room len", len(r.byid))
   return len(r.byid) < 3
 }
 
@@ -127,38 +154,25 @@ func (r *Room) Run() {
     fmt.Println("Room Run here..")
     select {
     case client := <-r.register:
-      fmt.Println("Register Client:", client.ID)
       r.clients[client] = true
-      for c := range r.clients {
-        fmt.Println("Registered Client:", c.ID)
-      }
       r.byid[client.ID] = client
-      /* Breaks Channel
-      client.room.broadcast <- interface{}(map[string]interface{}{
-        "type": "connect",
-        "id" : client.ID,
-      })*/
-    case client := <-r.unregister: // websocket closed
+      case client := <-r.unregister: // websocket closed
       fmt.Println("Unregistering Client:", client.ID)
       if _, ok := r.clients[client]; ok {
         delete(r.clients, client)
         close(client.send)
       }
     case message := <-r.broadcast:
-      fmt.Println("Broadcast message")
-      common.PrintJSON(message.(map[string]interface{}))
-      fmt.Println("Registered Clients:", len(r.clients))
-      for c := range r.clients {
-        fmt.Println("Registered Client:", c.ID)
+      f := message.(map[string]interface{})
+      fmt.Println(f["type"])
+      if f["type"] == "win" {
+        f["handle"] = r.byid[f["id"].(string)].Handle
+        r.StopGame()
       }
-      n := len(r.broadcast)
-      fmt.Println("Messages to broadcast:", n)
       for client := range r.clients {
-        fmt.Println("Client ID to send message:", client.ID)
         select {
         case client.send <- message:
         default:
-          fmt.Println("Closing Client:", client.ID)
           close(client.send)
           delete(r.clients, client)
         }
