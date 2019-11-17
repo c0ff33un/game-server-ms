@@ -81,7 +81,7 @@ func (r *Room) StartGame() {
       })
     }
     r.broadcast <- interface{}(map[string]interface{}{
-      "type": "grid",
+      "type": "setup",
       "grid": r.game.Board.Grid,
     })
     r.Running = true
@@ -126,8 +126,8 @@ func (r *Room) closeRoom() {
 }
 
 func (r *Room) playerConnected(id string) bool {
-  if c, ok := r.byid[id]; ok {
-    _, ok := r.clients[c]
+  if c, ok := r.byid[id]; ok { // check registered
+    _, ok := r.clients[c] // check WS Connection
     return ok
   }
   return false
@@ -143,7 +143,7 @@ func (r *Room) OkToConnectPlayer(id string) bool {
     return true
   }
   fmt.Println("Room len", len(r.byid))
-  return len(r.byid) < 3
+  return len(r.byid) < 3 && !r.Running
 }
 
 func (r *Room) Run() {
