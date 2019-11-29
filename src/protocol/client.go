@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"encoding/json"
+  "sync"
 
 	"github.com/gorilla/websocket"
 	//"github.com/coff33un/game-server-ms/src/common"
@@ -51,12 +52,13 @@ type Client struct {
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
-func (c *Client) ReadPump() {
+func (c *Client) ReadPump(wg *sync.WaitGroup) {
   fmt.Println("ReadPump Started")
 	defer func() {
 	  fmt.Println("ReadPump Ended")
 		c.room.unregister <- c
 		c.conn.Close()
+    wg.Done()
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -101,13 +103,14 @@ func writeJSON(w io.WriteCloser, v interface{}) error {
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Client) WritePump() {
+func (c *Client) WritePump(wg *sync.WaitGroup) {
   fmt.Println("WritePump Started")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 	  fmt.Println("WritePump Ended")
 		ticker.Stop()
 		c.conn.Close()
+    wg.Done()
 	}()
 	for {
 		select {
@@ -115,6 +118,7 @@ func (c *Client) WritePump() {
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
         // The hub closed the channel.
+        fmt.Println("The hub closed the channel")
         c.conn.WriteMessage(websocket.CloseMessage, []byte{})
         return
       }

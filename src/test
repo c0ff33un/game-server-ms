@@ -1,0 +1,2 @@
+export GRAPHQL_URL=ec2-3-231-146-168.compute-1.amazonaws.com 
+go run *.go

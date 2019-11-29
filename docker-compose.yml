@@ -7,15 +7,8 @@ services:
     environment:
       MONGO_URL: game-server-db
       PROD: 1
-    networks:
-      - taurus-network
   game-server-db:
     image: mongo:4.2.0-bionic
     ports:
       - "27018:27018"
-    networks:
-      - taurus-network
 
-networks:
-  taurus-network:
-    external: true
