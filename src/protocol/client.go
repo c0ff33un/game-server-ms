@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -52,13 +51,13 @@ type Client struct {
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
-func (c *Client) ReadPump(wg *sync.WaitGroup) {
+func (c *Client) ReadPump() {
 	fmt.Println("ReadPump Started")
 	defer func() {
 		fmt.Println("ReadPump Ended")
 		c.room.unregister <- c
 		c.conn.Close()
-		wg.Done()
+		c.room.Done() // Anonymous WaitGroup
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -102,14 +101,14 @@ func writeJSON(w io.WriteCloser, v interface{}) error {
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Client) WritePump(wg *sync.WaitGroup) {
+func (c *Client) WritePump() {
 	fmt.Println("WritePump Started")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		fmt.Println("WritePump Ended")
 		ticker.Stop()
 		c.conn.Close()
-		wg.Done()
+		c.room.Done() // Anonymous WaitGroup
 	}()
 	for {
 		select {

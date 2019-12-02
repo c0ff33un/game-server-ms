@@ -140,7 +140,7 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			return
 		}
-		fmt.Println("Setup Room", v)
+		fmt.Println("Room Setup")
 		room.SetupGame(v)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"id": room.ID})
@@ -232,7 +232,7 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
 	id = strconv.Itoa(f.Data.User.Id)
 	handle = f.Data.User.Handle
 
-	fmt.Printf("The id is: %v, the handle is: %v", id, handle)
+	fmt.Printf("The id is: %v, the handle is: %v\n", id, handle)
 
 	if !room.OkToConnectPlayer(id) {
 		fmt.Println("Not ok to connect to room")

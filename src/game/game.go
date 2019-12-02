@@ -31,7 +31,7 @@ type SetupGameMessage struct {
 
 type Game struct {
 	Board   *Board
-	players map[string]*Player
+	Players map[string]*Player
 	Exit    struct {
 		X int
 		Y int
@@ -55,7 +55,7 @@ func NewGame(v SetupGameMessage, broadcast chan map[string]interface{}, players 
 		Board:   b,
 		Exit:    v.Exit,
 		Begin:   v.Begin,
-		players: make(map[string]*Player),
+		Players: make(map[string]*Player),
 
 		broadcast: broadcast,
 		Update:    make(chan map[string]interface{}),
@@ -63,20 +63,37 @@ func NewGame(v SetupGameMessage, broadcast chan map[string]interface{}, players 
 	}
 	x, y := v.Begin.Y, v.Begin.X
 	for _, player := range players {
-		game.players[player] = NewPlayer(x, y, game)
+		game.Players[player] = NewPlayer(x, y, player, game)
 	}
 	return game
 }
 
-func (g *Game) updateWorld(f interface{}) {
-	m := f.(map[string]interface{})
+func (g *Game) BoardMessage() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "start",
+		"grid": g.Board.Grid,
+	}
+}
+
+func between(a, b, x int) bool {
+	return a <= x && x <= b
+}
+
+func (game *Game) validPosition(x, y int) bool {
+	cols, rows := game.Board.Cols, game.Board.Rows
+	if between(0, cols-1, x) && between(0, rows-1, y) {
+		wall := game.Board.Grid[cols*y+x]
+		return !wall
+	}
+	return false
+}
+
+func (g *Game) updateWorld(m map[string]interface{}) {
 	switch m["type"].(string) {
 	case "move":
 		id, direction := m["id"].(string), m["direction"].(string)
-		result := g.players[id].move(direction)
+		result := g.Players[id].move(direction)
 		if result != nil {
-			result["id"] = id
-			result["type"] = "move"
 			x, y := result["x"], result["y"]
 			g.broadcast <- result
 			if x == g.Exit.Y && y == g.Exit.X {
@@ -91,6 +108,10 @@ func (g *Game) updateWorld(f interface{}) {
 }
 
 func (g *Game) Run() {
+	for _, player := range g.Players {
+		g.broadcast <- player.MoveMessage()
+	}
+	g.broadcast <- g.BoardMessage()
 	for {
 		fmt.Println("Game Run here..")
 		select {
