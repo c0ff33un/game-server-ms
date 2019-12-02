@@ -34,7 +34,7 @@ type Room struct {
 
 	register   chan *Client
 	unregister chan *Client
-	broadcast  chan interface{}
+	broadcast  chan map[string]interface{}
 }
 
 func genId() string {
@@ -55,7 +55,7 @@ func NewRoom(h *Hub) *Room {
 
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
-		broadcast:  make(chan interface{}),
+		broadcast:  make(chan map[string]interface{}),
 	}
 	room.hub.register <- room
 	return room
@@ -71,45 +71,46 @@ func (r *Room) SetupGame(v game.SetupGameMessage) {
 	r.game = game.NewGame(v, r.broadcast, players)
 	r.Setup = true
 	r.Ready = true
-	r.broadcast <- interface{}(map[string]interface{}{
+	r.broadcast <- map[string]interface{}{
 		"type": "setup",
-	})
+	}
 	fmt.Println("Room Setup")
 }
 
 func (r *Room) StartGame() {
-	if r.Ready && r.Setup {
-		for player := range r.clients {
-			x, y := r.game.Begin.X, r.game.Begin.Y
-			r.broadcast <- interface{}(map[string]interface{}{
-				"type": "move",
-				"id":   player.ID,
-				"x":    y,
-				"y":    x,
-			})
-		}
-		r.broadcast <- interface{}(map[string]interface{}{
-			"type": "start",
-			"grid": r.game.Board.Grid,
-		})
-		r.Running = true
-		go r.game.Run()
-	} else {
+	if !r.Ready || !r.Setup {
 		fmt.Println("Room Not Setup")
+		return
 	}
+
+	for player := range r.clients {
+		x, y := r.game.Begin.X, r.game.Begin.Y
+		r.broadcast <- map[string]interface{}{
+			"type": "move",
+			"id":   player.ID,
+			"x":    y,
+			"y":    x,
+		}
+	}
+	r.broadcast <- map[string]interface{}{
+		"type": "start",
+		"grid": r.game.Board.Grid,
+	}
+	r.Running = true
+	go r.game.Run()
 }
 
 func (r *Room) StopGame() {
 	if !r.Running {
 		fmt.Println("Cannot Stop A Room that is Not Running")
-	} else {
-		fmt.Println("Try Stop Game")
-		r.Running = false
-		r.Ready = false
-		r.Setup = false
-		close(r.game.Update)
-		fmt.Println("Gracefully Stopped Game")
+		return
 	}
+	fmt.Println("Try Stop Game")
+	r.Running = false
+	r.Ready = false
+	r.Setup = false
+	close(r.game.Quit)
+	fmt.Println("Gracefully Stopped Game")
 }
 
 func (r *Room) writeRoomInfo() {
@@ -199,10 +200,8 @@ func (r *Room) Run() {
 				delete(r.clients, client)
 			}
 		case message := <-r.broadcast:
-			f := message.(map[string]interface{})
-			fmt.Println(f["type"])
-			if f["type"] == "win" {
-				f["handle"] = r.byid[f["id"].(string)].Handle
+			if message["type"] == "win" {
+				message["handle"] = r.byid[message["id"].(string)].Handle
 				r.StopGame()
 			}
 			for client := range r.clients {

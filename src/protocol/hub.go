@@ -1,24 +1,16 @@
 package protocol
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
-	"net/url"
-	"os"
 	"strconv"
-	"time"
 
-	"github.com/coff33un/game-server-ms/src/common"
 	"github.com/coff33un/game-server-ms/src/game"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var upgrader = websocket.Upgrader{
@@ -32,7 +24,6 @@ var upgrader = websocket.Upgrader{
 type Hub struct {
 
 	// Registered Room Games
-	db    *mongo.Client
 	Rooms map[*Room]bool
 	Byid  map[string]*Room
 
@@ -43,24 +34,7 @@ type Hub struct {
 }
 
 func NewHub() *Hub {
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	mongo_url := os.Getenv("MONGO_URL")
-	if mongo_url == "" {
-		mongo_url = "localhost:27017"
-	}
-	fmt.Println(mongo_url)
-	addr, err := net.LookupHost(mongo_url)
-	fmt.Println(addr, err)
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+mongo_url))
-	if err != nil {
-		log.Println(err)
-	}
-	err = client.Connect(ctx)
-	if err != nil {
-		log.Println(err)
-	}
 	return &Hub{
-		db:         client,
 		register:   make(chan *Room),
 		unregister: make(chan *Room),
 		Rooms:      make(map[*Room]bool),
@@ -68,12 +42,25 @@ func NewHub() *Hub {
 	}
 }
 
+func ParseFormBadRequest(w http.ResponseWriter, r *http.Request) error {
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Unable to Parse Request", http.StatusBadRequest)
+		return err
+	}
+	return nil
+}
+
+func disableCors(w *http.ResponseWriter) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+}
+
 func (h *Hub) getRoom(id string) (*Room, error) {
-	if room, ok := h.Byid[id]; ok {
-		return room, nil
-	} else {
+	room, ok := h.Byid[id]
+	if !ok {
 		return nil, errors.New("Room Not Found")
 	}
+	return room, nil
 }
 
 func (h *Hub) getRoom404(w http.ResponseWriter, r *http.Request) (*Room, error) {
@@ -88,7 +75,7 @@ func (h *Hub) getRoom404(w http.ResponseWriter, r *http.Request) (*Room, error) 
 }
 
 func (h *Hub) RoomReady(w http.ResponseWriter, r *http.Request) {
-	common.DisableCors(&w)
+	disableCors(&w)
 	switch r.Method {
 	case http.MethodOptions:
 		w.Header().Set("Access-Control-Allow-Methdods", "OPTIONS,GET")
@@ -98,18 +85,18 @@ func (h *Hub) RoomReady(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			return
 		}
-		if room.Ready {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintln(w, "Room Ready")
-		} else {
+		if !room.Ready {
 			w.WriteHeader(http.StatusAccepted) // Room exists but pending ready
 			fmt.Fprintln(w, "Room Not Ready")
+			return
 		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Room Ready")
 	}
 }
 
 func (h *Hub) SetupReady(w http.ResponseWriter, r *http.Request) {
-	common.DisableCors(&w)
+	disableCors(&w)
 	switch r.Method {
 	case http.MethodOptions:
 		w.Header().Set("Access-Control-Allow-Methods", "OPTIONS,PUT")
@@ -119,18 +106,18 @@ func (h *Hub) SetupReady(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			return
 		}
-		if room.Ready && room.Setup {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintln(w, "Room Setup and Ready")
-		} else {
+		if !room.Ready || !room.Setup {
 			w.WriteHeader(http.StatusAccepted) // Room exists but pending ready
 			fmt.Fprintln(w, "Room Not Ready")
+			return
 		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Room Setup and Ready")
 	}
 }
 
 func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
-	common.DisableCors(&w)
+	disableCors(&w)
 	fmt.Println("Setup Room")
 	fmt.Println(r.Method)
 	switch r.Method {
@@ -161,7 +148,7 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
-	common.DisableCors(&w)
+	disableCors(&w)
 	switch r.Method {
 	case http.MethodOptions:
 		w.Header().Set("Access-Control-Allow-Methods", "OPTIONS,PUT")
@@ -184,38 +171,43 @@ func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type Query struct {
-	Data struct {
-		User struct {
-			Id     int
-			Handle string
-			Email  string
-			Guest  bool
+func (hub *Hub) GetRoom(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	fmt.Println("here")
+	disableCors(&w)
+	switch r.Method {
+	case http.MethodGet:
+		err := r.ParseForm()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		id := vars["roomid"]
+		w.Header().Set("Content-Type", "application/json")
+		if room, ok := hub.Byid[id]; ok {
+			json.NewEncoder(w).Encode(room)
+		} else {
+			http.NotFound(w, r)
 		}
 	}
 }
 
-func TokenQuery(token string) (*Query, error) {
-	url := "http://" + os.Getenv("GRAPHQL_URL") + "/graphql?query=" + url.QueryEscape(`{ user {id handle email guest} }`)
-	bearer := "Bearer " + token
-	req, err := http.NewRequest("GET", url, nil)
-	fmt.Println("TokenQuery url:", url)
-	req.Header.Add("Authorization", bearer)
-	req.Header.Add("Accept", "application/json")
-	client := &http.Client{}
-	r, err := client.Do(req)
-	if err != nil {
-		log.Println("Error on response.\n[ERROR] -", err)
-		return nil, err
+func (hub *Hub) CreateRoom(w http.ResponseWriter, r *http.Request) {
+	disableCors(&w)
+	switch r.Method {
+	case http.MethodPost:
+		room := NewRoom(hub)
+		js, err := json.Marshal(map[string]string{"id": room.ID})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Println("Created room")
+		go room.Run()
+		fmt.Println("room Run running")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(js)
 	}
-	var f Query
-	err = json.NewDecoder(r.Body).Decode(&f)
-	if err != nil {
-		fmt.Println(r.Body)
-		log.Println("Error decoding JSON.\n[ERROR] -", err)
-		return nil, err
-	}
-	return &f, nil
 }
 
 func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
@@ -224,42 +216,38 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	err = common.ParseFormBadRequest(w, r)
+	err = ParseFormBadRequest(w, r)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	token := r.Form.Get("token")
 	var id, handle string
-	if os.Getenv("NO_AUTH") != "" {
-		id = token
-		handle = token
-	} else {
-		f, err := TokenQuery(token)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		id = strconv.Itoa(f.Data.User.Id)
-		handle = f.Data.User.Handle
+
+	f, err := TokenQuery(token)
+	if err != nil {
+		log.Println(err)
+		return
 	}
+	id = strconv.Itoa(f.Data.User.Id)
+	handle = f.Data.User.Handle
 
-	fmt.Println("The id is:", id)
-	fmt.Println("The handle is:", handle)
-	if room.OkToConnectPlayer(id) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			fmt.Println("Error", err)
-			log.Println(err)
-			return
-		}
-		client := &Client{room: room, ID: id, Handle: handle, conn: conn, send: make(chan interface{}, 256)}
-		client.room.register <- client
+	fmt.Printf("The id is: %v, the handle is: %v", id, handle)
 
-		fmt.Println("ServeWS: Registered new client to room")
-	} else {
+	if !room.OkToConnectPlayer(id) {
 		fmt.Println("Not ok to connect to room")
+		return
 	}
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println("Error", err)
+		log.Println(err)
+		return
+	}
+	client := &Client{room: room, ID: id, Handle: handle, conn: conn, send: make(chan map[string]interface{}, 256)}
+	client.room.register <- client
+
+	fmt.Println("ServeWS: Registered new client to room")
 }
 
 func (h *Hub) Run() {

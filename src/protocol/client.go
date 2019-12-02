@@ -6,12 +6,12 @@ package protocol
 
 import (
 	//"bytes"
-	"log"
-	"time"
+	"encoding/json"
 	"fmt"
 	"io"
-	"encoding/json"
-  "sync"
+	"log"
+	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	//"github.com/coff33un/game-server-ms/src/common"
@@ -44,7 +44,7 @@ type Client struct {
 	conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
-	send chan interface{}
+	send chan map[string]interface{}
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -53,49 +53,48 @@ type Client struct {
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
 func (c *Client) ReadPump(wg *sync.WaitGroup) {
-  fmt.Println("ReadPump Started")
+	fmt.Println("ReadPump Started")
 	defer func() {
-	  fmt.Println("ReadPump Ended")
+		fmt.Println("ReadPump Ended")
 		c.room.unregister <- c
 		c.conn.Close()
-    wg.Done()
+		wg.Done()
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-	  var v interface{}
-		err := c.conn.ReadJSON(&v)
+		var m map[string]interface{}
+		err := c.conn.ReadJSON(&m)
 		if err != nil {
-		  fmt.Println("Error", err)
+			fmt.Println("Error", err)
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v", err)
 			}
 			break
 		}
-		m := v.(map[string]interface{})
-    //common.PrintJSON(m)
-    m["id"] = c.ID // Backend keeps the Clients IDs not Frontend
-    switch m["type"] {
-    case "win":
-      c.room.StopGame()
-      c.room.broadcast <- interface{}(m)
-    case "connect":
-      m["handle"] = c.Handle
-      c.room.broadcast <- interface{}(m)
-    case "message":
-      c.room.broadcast <- interface{}(m)
-    case "move":
-      if (c.room.Running) {
-        c.room.game.Update <- interface{}(m)
-      }
-    }
+		//common.PrintJSON(m)
+		m["id"] = c.ID // Backend keeps the Clients IDs not Frontend
+		switch m["type"] {
+		case "win":
+			c.room.StopGame()
+			c.room.broadcast <- m
+		case "connect":
+			m["handle"] = c.Handle
+			c.room.broadcast <- m
+		case "message":
+			c.room.broadcast <- m
+		case "move":
+			if c.room.Running {
+				c.room.game.Update <- m
+			}
+		}
 	}
 }
 
 func writeJSON(w io.WriteCloser, v interface{}) error {
-  err := json.NewEncoder(w).Encode(v)
-  return err
+	err := json.NewEncoder(w).Encode(v)
+	return err
 }
 
 // writePump pumps messages from the hub to the websocket connection.
@@ -104,27 +103,27 @@ func writeJSON(w io.WriteCloser, v interface{}) error {
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
 func (c *Client) WritePump(wg *sync.WaitGroup) {
-  fmt.Println("WritePump Started")
+	fmt.Println("WritePump Started")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
-	  fmt.Println("WritePump Ended")
+		fmt.Println("WritePump Ended")
 		ticker.Stop()
 		c.conn.Close()
-    wg.Done()
+		wg.Done()
 	}()
 	for {
 		select {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-        // The hub closed the channel.
-        fmt.Println("The hub closed the channel")
-        c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-        return
-      }
+				// The hub closed the channel.
+				fmt.Println("The hub closed the channel")
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
 			//common.PrintJSON(message.(map[string]interface{}))
 
-			w, err := c.conn.NextWriter(websocket.TextMessage) // Uses this instead of c.coon.WriteJSON to reuse NextWriter
+			w, err := c.conn.NextWriter(websocket.TextMessage) // Uses this instead of c.conn.WriteJSON to reuse Writer
 			if err != nil {
 				return
 			}
@@ -147,4 +146,3 @@ func (c *Client) WritePump(wg *sync.WaitGroup) {
 		}
 	}
 }
-
