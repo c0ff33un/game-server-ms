@@ -16,7 +16,6 @@ import (
 type Room struct {
 	ID          string `json:"_id"`
 	Description string `json:"description"`
-	Length      int    `json:"length"`
 	Capacity    int    `json:"capacity"`
 	Ready       bool   `json:"ready"`
 	Setup       bool   `json:"setup"`
@@ -49,7 +48,6 @@ func NewRoom(h *Hub) *Room {
 	room := &Room{
 		ID:         id,
 		hub:        h,
-		Length:     0,
 		Capacity:   3,
 		activity:   time.Now(),
 		clients:    make(map[*Client]bool),
@@ -152,8 +150,7 @@ func (r *Room) OkToConnectPlayer(id string) bool {
 		fmt.Println("User is registrered and Disconnected")
 		return true
 	}
-	fmt.Println("Room len", len(r.byid))
-	return r.Length < r.Capacity && !r.Running && !r.Setup
+	return len(r.byid) < r.Capacity && !r.Running && !r.Setup
 }
 
 func (r *Room) send(client *Client, message map[string]interface{}) {
@@ -195,7 +192,6 @@ func (r *Room) Run() {
 			r.clients[client] = true
 			r.byid[client.ID] = client
 			fmt.Println("Room Go: registered client", client.ID)
-			r.Length += 1
 			r.Add(2)
 			go client.WritePump()
 			go client.ReadPump()
@@ -210,14 +206,8 @@ func (r *Room) Run() {
 			fmt.Println("Unregistering Client:", client.ID)
 			close(client.send)
 			delete(r.clients, client)
-			if !r.Running {
-				// Allow users to reconnect even if room is full.
-				// Create Space in Room
-				delete(r.byid, client.ID)
-				r.Length -= 1
-				if r.Length == 0 {
-					r.Close()
-				}
+			if len(r.byid) == 0 {
+				r.Close()
 			}
 		case message := <-r.unicast:
 			id := message["id"].(string)

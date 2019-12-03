@@ -68,21 +68,27 @@ func (c *Client) ReadPump() {
 		if err != nil {
 			fmt.Println("Error", err)
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+				log.Printf("error: %v\n", err)
 			}
 			break
 		}
 		//common.PrintJSON(m)
 		m["id"] = c.ID // Backend keeps the Clients IDs not Frontend
 		switch m["type"] {
-		case "win":
-			c.room.StopGame()
-			c.room.broadcast <- m
 		case "connect":
 			m["handle"] = c.Handle
+			m["length"] = len(c.room.byid)
 			c.room.broadcast <- m
 		case "message":
 			c.room.broadcast <- m
+		case "leave":
+			delete(c.room.byid, c.ID)
+			c.conn.Close()
+			if len(c.room.byid) != 0 {
+				m["handle"] = c.Handle
+				m["length"] = len(c.room.byid)
+				c.room.broadcast <- m
+			}
 		case "move":
 			if c.room.Running {
 				c.room.game.Update <- m
