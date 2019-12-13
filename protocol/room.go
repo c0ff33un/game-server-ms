@@ -1,0 +1,228 @@
+package protocol
+
+import (
+	"fmt"
+	"io"
+	"log"
+	//"context"
+	"math/rand"
+	"strconv"
+	"sync"
+	"time"
+
+	//"github.com/segmentio/ksuid"
+	"github.com/coff33un/game-server-ms/game"
+)
+
+type Room struct {
+	ID          string `json:"id" bson:"_id"`
+	Description string `json:"description"`
+	Capacity    int    `json:"capacity"`
+	Length      int    `json:"length"`
+	Ready       bool   `json:"ready"`
+	Setup       bool   `json:"setup"`
+	Running     bool   `json:"runnning"`
+	Closing     bool   `json:"closing"`
+	Public      bool   `json:"public"`
+
+	clients        map[*Client]bool
+	byid           map[string]*Client
+	activity       time.Time
+	hub            *Hub
+	game           *game.GameRunner
+	register       chan *Client
+	unregister     chan *Client
+	broadcast      chan interface{}
+	quit           chan struct{}
+	sync.WaitGroup `bson:"-"`
+}
+
+func genId() string {
+	return strconv.Itoa(rand.Intn(10000))
+}
+
+func NewRoom(h *Hub) *Room {
+	id := genId()
+	for h.Byid[id] != nil {
+		id = genId()
+	}
+	fmt.Println("New RoomID:", id)
+	room := &Room{
+		ID:         id,
+		hub:        h,
+		Capacity:   3,
+		activity:   time.Now(),
+		clients:    make(map[*Client]bool),
+		byid:       make(map[string]*Client),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
+		broadcast:  make(chan interface{}),
+		quit:       make(chan struct{}),
+	}
+	room.hub.register <- room
+	return room
+}
+
+func (r *Room) SetupGame(body io.ReadCloser) error {
+	fmt.Println("Setting up game.")
+
+	var players []string
+	for player := range r.clients {
+		players = append(players, player.Id)
+	}
+	game, err := game.ClassicGameRunner(body, r.broadcast, players)
+	if err != nil {
+		return err
+	}
+	r.game = game
+	r.Setup, r.Ready = true, true
+	r.broadcast <- map[string]interface{}{
+		"type": "setup",
+	}
+	fmt.Println("Room Succesfully Setup")
+	return nil
+}
+
+func (r *Room) StartGame() {
+	if !r.Ready || !r.Setup {
+		fmt.Println("Room Not Setup")
+		return
+	}
+
+	r.Running = true
+	fmt.Println("Here")
+	go r.game.Run()
+}
+
+func (r *Room) StopGame() {
+	if !r.Running {
+		fmt.Println("Cannot Stop A Room that is Not Running")
+		return
+	}
+	fmt.Println("Try Stop Game")
+	r.Running = false
+	r.Ready = false
+	r.Setup = false
+	close(r.game.Quit)
+	fmt.Println("Gracefully Stopped Game")
+}
+
+func (r *Room) Close() {
+	fmt.Println("Closing Room")
+	if r.Closing {
+		return
+	}
+	r.Closing = true
+	if r.Running {
+		r.StopGame()
+	}
+	r.hub.unregister <- r
+	for client := range r.clients {
+		close(client.send)
+		delete(r.clients, client)
+	}
+	r.Wait() // Anonymous WaitGroup
+	close(r.quit)
+	log.Printf("Closed room %v", r.ID)
+}
+
+func (r *Room) playerConnected(id string) bool {
+	if c, ok := r.byid[id]; ok { // check Registered
+		_, ok := r.clients[c] // check WS Connection
+		return ok
+	}
+	return false
+}
+
+func (r *Room) OkToConnectPlayer(id string) bool {
+	if r.Closing {
+		return false
+	}
+	if r.playerConnected(id) {
+		fmt.Println("User already Connected to Room")
+		return false // there can't be two connections of the same user
+	}
+	if _, ok := r.byid[id]; ok {
+		fmt.Println("User is registrered and Disconnected")
+		return true
+	}
+	return r.Length < r.Capacity && !r.Running && !r.Setup
+}
+
+func (r *Room) send(client *Client, message interface{}) {
+	select {
+	case client.send <- message:
+	default:
+		close(client.send)
+		delete(r.clients, client)
+	}
+}
+
+func (r *Room) sendBroadCast(message interface{}) {
+	for client := range r.clients {
+		r.send(client, message)
+	}
+}
+
+func (r *Room) cullInactive(minutes int) {
+	log.Printf("Checking for room inactivity every: %v minutes\n", minutes)
+	duration := time.Duration(minutes) * time.Minute
+	for {
+		select {
+		case <-r.quit:
+			return
+		case <-time.After(duration):
+			if time.Since(r.activity) > duration {
+				r.Close()
+				return
+			}
+		}
+	}
+}
+
+func (r *Room) Run() {
+	defer func() {
+		fmt.Println("Room Died")
+	}()
+	go r.cullInactive(10)
+	for {
+		select {
+		case <-r.quit:
+			return
+		case client := <-r.register:
+			fmt.Println("Trying to register")
+			r.clients[client] = true
+			r.byid[client.Id] = client
+			r.Length = len(r.byid)
+			fmt.Println("Room Go: registered client", client.Id)
+			r.Add(2)
+			go client.WritePump()
+			go client.ReadPump()
+			if r.Running {
+				for _, f := range r.game.GetStatus() {
+					r.send(client, f)
+				}
+			}
+		case client := <-r.unregister: // websocket closed
+			fmt.Println("Unregistering Client:", client.Id)
+			close(client.send)
+			delete(r.clients, client)
+			if client.Leave {
+				delete(r.byid, client.Id)
+				r.Length = len(r.byid)
+				r.broadcast <- client.getLeaveMessage(r.Length)
+			}
+			if len(r.byid) == 0 {
+				r.Close()
+			}
+		case message := <-r.broadcast:
+			if message, ok := message.(game.WinMessage); ok {
+				message.Handle = r.byid[message.Id].Handle
+				r.sendBroadCast(message)
+				r.StopGame()
+				continue
+			}
+			r.sendBroadCast(message)
+		}
+	}
+}

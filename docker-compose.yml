@@ -1,14 +1,7 @@
 version: '3'
 services:
-  taurus-game-server-ms:
-    image: miaortizma/taurus-game-server-ms
-    ports:
-      - "8888:8080"
-    environment:
-      MONGO_URL: game-server-db
-      PROD: 1
   game-server-db:
     image: mongo:4.2.0-bionic
     ports:
-      - "27018:27018"
+      - "27017:27017"
 
