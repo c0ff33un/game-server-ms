@@ -23,8 +23,11 @@ var rooms *mongo.Collection
 func GetRooms() {
 	// Lazy Loading
 	connect.Do(func() {
-		url := "mongodb://" + os.Getenv("MONGO_URL")
+		url := "mongodb://" + os.Getenv("MONGO_URL") + ":27017/?replicaSet=rs0"
 		fmt.Printf("Connecting to db %v\n", url)
+
+		fmt.Println(url)
+		fmt.Println("mongodb://taurus-game-server-db-0:27017/?replicaSet=rs0")
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 		client, err := mongo.Connect(ctx, options.Client().ApplyURI(url))
 		if err != nil {

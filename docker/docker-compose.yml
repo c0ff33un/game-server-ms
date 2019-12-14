@@ -1,0 +1,17 @@
+version: '3'
+services:
+  taurus-game-server-db-0:
+    hostname: taurus-game-server-db-0
+    container_name: taurus-game-server-db-0
+    image: taurusgame/game-server-db
+    ports:
+      - 27017:27017
+  taurus-game-server-ms:
+    image: taurusgame/game-server-ms
+    ports:
+      - "8080:8080"
+    environment:
+      - MONGO_URL=taurus-game-server-db-0
+      - GRAPHQL_URL=https://taurusmaze.co/graphql
+
+

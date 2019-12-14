@@ -1,7 +1,0 @@
-version: '3'
-services:
-  game-server-db:
-    image: mongo:4.2.0-bionic
-    ports:
-      - "27017:27017"
-
