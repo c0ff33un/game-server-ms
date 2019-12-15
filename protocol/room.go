@@ -242,12 +242,12 @@ func (r *Room) Run() {
 			}
 		case client := <-r.unregister: // websocket closed
 			log.Println("Unregistering Client:", client.Id)
-			close(client.send)
 			delete(r.clients, client)
 			if client.Leave {
+				log.Println("Client Leaving")
 				delete(r.byid, client.Id)
 				r.Length = len(r.byid)
-				r.broadcast <- client.getLeaveMessage(r.Length)
+				r.sendBroadCast(client.getLeaveMessage(r.Length))
 			}
 			if len(r.byid) == 0 {
 				log.Println("Closing room due to players disconnection")

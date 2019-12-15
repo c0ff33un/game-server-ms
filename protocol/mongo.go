@@ -23,7 +23,7 @@ var rooms *mongo.Collection
 func GetRooms() {
 	// Lazy Loading
 	connect.Do(func() {
-		url := "mongodb://" + os.Getenv("MONGO_URL") + ":27017"
+		url := os.Getenv("MONGO_URL")
 		log.Printf("Connecting to db %v\n", url)
 
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)

@@ -1,1 +1,1 @@
-sudo docker push taurusgame/game-server-ms
+docker push taurusgame/game-server-ms

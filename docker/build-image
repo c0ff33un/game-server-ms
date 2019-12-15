@@ -1,1 +1,1 @@
-sudo docker build -t taurusgame/game-server-ms -f ./Dockerfile.multistage ../
+docker build -t taurusgame/game-server-ms -f ./Dockerfile.multistage ../
