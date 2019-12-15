@@ -27,7 +27,7 @@ func GetUser(token string) (Response, error) {
 		}
 	`)
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
+	//req.Header.Set("Accept", "application/json")
 	ctx := context.TODO()
 	respData := Response{}
 	err := client.Run(ctx, req, &respData)

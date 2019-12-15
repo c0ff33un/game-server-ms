@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -19,6 +19,6 @@ func routes() error {
 	s.HandleFunc("/room/ready/{roomid}", hub.RoomReady)
 	s.HandleFunc("/ws/{roomid}", hub.ServeWs)
 	err := http.ListenAndServe(":8080", r)
-	fmt.Println("Routes set up")
+	log.Println("Routes set up")
 	return err
 }

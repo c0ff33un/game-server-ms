@@ -7,7 +7,6 @@ package protocol
 import (
 	//"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"time"
@@ -83,9 +82,9 @@ type leaveMessage struct {
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
 func (c *Client) ReadPump() {
-	fmt.Println("ReadPump Started")
+	log.Println("ReadPump Started")
 	defer func() {
-		fmt.Println("ReadPump Ended")
+		log.Println("ReadPump Ended")
 		c.room.unregister <- c
 		c.conn.Close()
 		c.room.Done() // Anonymous WaitGroup
@@ -96,7 +95,7 @@ func (c *Client) ReadPump() {
 	for {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
-			fmt.Println("Error", err)
+			log.Println("Error", err)
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v\n", err)
 			}
@@ -146,10 +145,10 @@ func writeJSON(w io.WriteCloser, v interface{}) error {
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
 func (c *Client) WritePump() {
-	fmt.Println("WritePump Started")
+	log.Println("WritePump Started")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
-		fmt.Println("WritePump Ended")
+		log.Println("WritePump Ended")
 		ticker.Stop()
 		c.conn.Close()
 		c.room.Done() // Anonymous WaitGroup
@@ -160,7 +159,7 @@ func (c *Client) WritePump() {
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
-				fmt.Println("The hub closed the channel")
+				log.Println("The hub closed the channel")
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}

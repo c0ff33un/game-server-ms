@@ -2,8 +2,8 @@ package game
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
+	"log"
 )
 
 type Board struct {
@@ -23,11 +23,6 @@ type SetupGameMessage struct {
 	Begin struct {
 		X int
 		Y int
-	}
-	Players []struct {
-		X  int
-		Y  int
-		Id string
 	}
 }
 
@@ -124,7 +119,7 @@ func (s *ClassicSimulator) simulateGame(g *Game, m interface{}) []interface{} {
 		id, direction := v.Id, v.Direction
 		player, ok := g.Players[id]
 		if !ok {
-			fmt.Println("player not found")
+			log.Println("player not found")
 			return nil
 		}
 		move := player.move(direction)
@@ -132,7 +127,7 @@ func (s *ClassicSimulator) simulateGame(g *Game, m interface{}) []interface{} {
 			x, y := move.X, move.Y
 			res = append(res, move)
 			if x == g.Exit.Y && y == g.Exit.X {
-				fmt.Println("User", id, "won")
+				log.Println("User", id, "won")
 				res = append(res, player.getWinMessage())
 			}
 		}
@@ -168,7 +163,7 @@ func (g *GameRunner) Run() {
 		g.broadcast <- f
 	}
 	for {
-		fmt.Println("Game Run here..")
+		log.Println("Game Run here..")
 		select {
 		case <-g.Quit:
 			return

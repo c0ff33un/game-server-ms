@@ -2,7 +2,7 @@ package protocol
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -23,25 +23,23 @@ var rooms *mongo.Collection
 func GetRooms() {
 	// Lazy Loading
 	connect.Do(func() {
-		url := "mongodb://" + os.Getenv("MONGO_URL") + ":27017/?replicaSet=rs0"
-		fmt.Printf("Connecting to db %v\n", url)
+		url := "mongodb://" + os.Getenv("MONGO_URL") + ":27017"
+		log.Printf("Connecting to db %v\n", url)
 
-		fmt.Println(url)
-		fmt.Println("mongodb://taurus-game-server-db-0:27017/?replicaSet=rs0")
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 		client, err := mongo.Connect(ctx, options.Client().ApplyURI(url))
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 
 		err = client.Ping(context.TODO(), nil)
 
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
-		fmt.Println("Connected to db")
+		log.Println("Connected to db")
 		rooms = client.Database(dbName).Collection(collection)
 		rooms.DeleteMany(context.TODO(), bson.D{})
 	})
@@ -49,24 +47,24 @@ func GetRooms() {
 
 func AddRoom(room *Room) {
 	GetRooms()
-	fmt.Println("Adding room to database")
+	log.Println("Adding room to database")
 	res, err := rooms.InsertOne(context.TODO(), room)
 	id := res.InsertedID
-	fmt.Printf("Inserted Id %v\n", id)
+	log.Printf("Inserted Id %v\n", id)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
-	fmt.Println("Finished adding room to database")
+	log.Println("Finished adding room to database")
 
 	cursor, err := rooms.Find(context.TODO(), bson.D{})
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	var results []bson.M
 	if err = cursor.All(context.TODO(), &results); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	for _, result := range results {
-		fmt.Println(result)
+		log.Println(result)
 	}
 }

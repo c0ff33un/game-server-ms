@@ -117,8 +117,7 @@ func (h *Hub) SetupReady(w http.ResponseWriter, r *http.Request) {
 
 func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
 	disableCors(&w)
-	fmt.Println("Setup Room")
-	fmt.Println(r.Method)
+	log.Println("Setup Room")
 	switch r.Method {
 	case http.MethodOptions:
 		w.Header().Set("Access-Control-Allow-Methods", "OPTIONS,PUT")
@@ -129,10 +128,10 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if room.Running {
-			fmt.Println("Cannot Setup Running Room")
+			log.Println("Cannot Setup Running Room")
 			return
 		}
-		fmt.Println("Room Setup")
+		log.Println("Room Setup")
 		err = room.SetupGame(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -152,16 +151,19 @@ func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		room, err := h.getRoom404(w, r)
 		if err != nil {
-			fmt.Println(err)
 			log.Println(err)
 			return
 		}
 		if room.Running {
-			fmt.Println("Room already Running")
+			log.Println("Room already Running")
 			return
 		}
-		fmt.Println("Start Room")
-		room.StartGame()
+		log.Println("Start Room")
+		err = room.StartGame()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"id": room.ID})
@@ -170,7 +172,6 @@ func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
 
 func (hub *Hub) GetRoom(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	fmt.Println("here")
 	disableCors(&w)
 	switch r.Method {
 	case http.MethodGet:
@@ -199,9 +200,9 @@ func (hub *Hub) CreateRoom(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fmt.Println("Created room")
+		log.Println("Created room")
 		go room.Run()
-		fmt.Println("room Run running")
+		log.Println("room Run running")
 		AddRoom(room)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(js)
@@ -226,31 +227,29 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
 		log.Println("shit", err)
 		return
 	}
-	fmt.Println(f)
 	id = strconv.Itoa(f.User.Id)
 	handle = f.User.Handle
 
-	fmt.Printf("The id is: %v, the handle is: %v\n", id, handle)
+	log.Printf("The id is: %v, the handle is: %v\n", id, handle)
 
 	if !room.OkToConnectPlayer(id) {
-		fmt.Println("Not ok to connect to room")
+		log.Println("Not ok to connect to room")
 		return
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		fmt.Println("Error", err)
-		log.Println(err)
+		log.Println("Error", err)
 		return
 	}
 	client := &Client{room: room, Id: id, Handle: handle, conn: conn, send: make(chan interface{}, 256)}
 	client.room.register <- client
 
-	fmt.Println("ServeWS: Registered new client to room")
+	log.Println("ServeWS: Registered new client to room")
 }
 
 func (h *Hub) Run() {
 	for {
-		fmt.Println("Hub run here")
+		log.Println("Hub run here")
 		select {
 		case room := <-h.register:
 			h.Rooms[room] = true

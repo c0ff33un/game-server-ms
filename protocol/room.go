@@ -1,11 +1,13 @@
 package protocol
 
 import (
-	"fmt"
+	"context"
+	"errors"
+	"github.com/machinebox/graphql"
 	"io"
 	"log"
-	//"context"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -46,7 +48,7 @@ func NewRoom(h *Hub) *Room {
 	for h.Byid[id] != nil {
 		id = genId()
 	}
-	fmt.Println("New RoomID:", id)
+	log.Println("New RoomID:", id)
 	room := &Room{
 		ID:         id,
 		hub:        h,
@@ -63,8 +65,41 @@ func NewRoom(h *Hub) *Room {
 	return room
 }
 
+type IdResponse struct {
+	Id string
+}
+
+func (r *Room) writeMatch(message game.WinMessage) error {
+	client := graphql.NewClient(os.Getenv("GRAPHQL_URL"))
+	req := graphql.NewRequest(`
+		mutation {
+			newMatch (winner: $winner, players: $players){ 
+				id
+			}
+		}
+	`)
+	req.Var("winner", message.Id)
+	players := "["
+	first := true
+	for id := range r.byid {
+		if first {
+			first = false
+			players = players + id
+			continue
+		}
+		players = players + "," + id
+	}
+	players = players + "]"
+	req.Var("players", players)
+	//req.Header.Set("Accept", "application/json")
+	ctx := context.TODO()
+	respData := IdResponse{}
+	err := client.Run(ctx, req, &respData)
+	return err
+}
+
 func (r *Room) SetupGame(body io.ReadCloser) error {
-	fmt.Println("Setting up game.")
+	log.Println("Setting up game.")
 
 	var players []string
 	for player := range r.clients {
@@ -79,36 +114,36 @@ func (r *Room) SetupGame(body io.ReadCloser) error {
 	r.broadcast <- map[string]interface{}{
 		"type": "setup",
 	}
-	fmt.Println("Room Succesfully Setup")
+	log.Println("Room Succesfully Setup")
 	return nil
 }
 
-func (r *Room) StartGame() {
+func (r *Room) StartGame() error {
 	if !r.Ready || !r.Setup {
-		fmt.Println("Room Not Setup")
-		return
+		log.Println("Room Not Setup")
+		return errors.New("Room Not Setup")
 	}
 
 	r.Running = true
-	fmt.Println("Here")
 	go r.game.Run()
+	return nil
 }
 
 func (r *Room) StopGame() {
 	if !r.Running {
-		fmt.Println("Cannot Stop A Room that is Not Running")
+		log.Println("Cannot Stop A Room that is Not Running")
 		return
 	}
-	fmt.Println("Try Stop Game")
+	log.Println("Try Stop Game")
 	r.Running = false
 	r.Ready = false
 	r.Setup = false
 	close(r.game.Quit)
-	fmt.Println("Gracefully Stopped Game")
+	log.Println("Gracefully Stopped Game")
 }
 
 func (r *Room) Close() {
-	fmt.Println("Closing Room")
+	log.Println("Closing Room")
 	if r.Closing {
 		return
 	}
@@ -118,8 +153,7 @@ func (r *Room) Close() {
 	}
 	r.hub.unregister <- r
 	for client := range r.clients {
-		close(client.send)
-		delete(r.clients, client)
+		client.conn.Close()
 	}
 	r.Wait() // Anonymous WaitGroup
 	close(r.quit)
@@ -139,11 +173,11 @@ func (r *Room) OkToConnectPlayer(id string) bool {
 		return false
 	}
 	if r.playerConnected(id) {
-		fmt.Println("User already Connected to Room")
+		log.Println("User already Connected to Room")
 		return false // there can't be two connections of the same user
 	}
 	if _, ok := r.byid[id]; ok {
-		fmt.Println("User is registrered and Disconnected")
+		log.Println("User is registrered and Disconnected")
 		return true
 	}
 	return r.Length < r.Capacity && !r.Running && !r.Setup
@@ -173,6 +207,7 @@ func (r *Room) cullInactive(minutes int) {
 			return
 		case <-time.After(duration):
 			if time.Since(r.activity) > duration {
+				log.Println("Closing Room due to inactivity")
 				r.Close()
 				return
 			}
@@ -182,19 +217,21 @@ func (r *Room) cullInactive(minutes int) {
 
 func (r *Room) Run() {
 	defer func() {
-		fmt.Println("Room Died")
+		log.Println("Room Died")
 	}()
-	go r.cullInactive(10)
+	go r.cullInactive(15)
 	for {
+		log.Println("Room Run here..")
+		r.activity = time.Now()
 		select {
 		case <-r.quit:
 			return
 		case client := <-r.register:
-			fmt.Println("Trying to register")
+			log.Println("Trying to register")
 			r.clients[client] = true
 			r.byid[client.Id] = client
 			r.Length = len(r.byid)
-			fmt.Println("Room Go: registered client", client.Id)
+			log.Println("Room Go: registered client", client.Id)
 			r.Add(2)
 			go client.WritePump()
 			go client.ReadPump()
@@ -204,7 +241,7 @@ func (r *Room) Run() {
 				}
 			}
 		case client := <-r.unregister: // websocket closed
-			fmt.Println("Unregistering Client:", client.Id)
+			log.Println("Unregistering Client:", client.Id)
 			close(client.send)
 			delete(r.clients, client)
 			if client.Leave {
@@ -213,11 +250,13 @@ func (r *Room) Run() {
 				r.broadcast <- client.getLeaveMessage(r.Length)
 			}
 			if len(r.byid) == 0 {
+				log.Println("Closing room due to players disconnection")
 				r.Close()
 			}
 		case message := <-r.broadcast:
 			if message, ok := message.(game.WinMessage); ok {
 				message.Handle = r.byid[message.Id].Handle
+				r.writeMatch(message)
 				r.sendBroadCast(message)
 				r.StopGame()
 				continue

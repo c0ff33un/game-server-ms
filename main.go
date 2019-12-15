@@ -6,7 +6,7 @@ package main
 
 import (
 	"flag"
-	//"github.com/gorilla/mux"
+	"log"
 
 	"github.com/coff33un/game-server-ms/protocol"
 )
@@ -22,6 +22,7 @@ func main() {
 	go hub.Run()
 	err := routes()
 	if err != nil {
+		log.Println(err)
 		return
 	}
 }

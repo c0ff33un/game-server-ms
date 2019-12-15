@@ -1,0 +1,7 @@
+version: '3'
+services:
+  taurus-game-server-db:
+    image: mongo 
+    ports:
+      - 27017:27017
+    entrypoint: ["mongod", "--bind_ip_all", "--replSet", "rs0"]
