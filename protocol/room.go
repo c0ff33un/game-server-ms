@@ -73,7 +73,7 @@ func (r *Room) writeMatch(message game.WinMessage) error {
 	client := graphql.NewClient(os.Getenv("GRAPHQL_URL"))
 	req := graphql.NewRequest(`
 		mutation {
-			newMatch (winner: $winner, players: $players){ 
+			newMatch (winner: $winner, players: $players, time: $time){ 
 				id
 			}
 		}
@@ -91,6 +91,7 @@ func (r *Room) writeMatch(message game.WinMessage) error {
 	}
 	players = players + "]"
 	req.Var("players", players)
+	req.Var("time", message.ResolverTime)
 	//req.Header.Set("Accept", "application/json")
 	ctx := context.TODO()
 	respData := IdResponse{}

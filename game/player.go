@@ -49,10 +49,11 @@ func (p *Player) getMoveMessage() MoveMessage {
 type WinMessage struct {
 	PlayerMessage
 	Handle string `json:"handle"`
+	ResolveTime int 
 }
 
-func (p *Player) getWinMessage() WinMessage {
-	return WinMessage{PlayerMessage: p.getPlayerMessage("win")}
+func (p *Player) getWinMessage(startTime time.Time) WinMessage {
+	return WinMessage{PlayerMessage: p.getPlayerMessage("win"), ResolveTime: time.Since(startTime)}
 }
 
 func (p *Player) move(direction string) MoveMessage {
