@@ -38,7 +38,7 @@ type Game struct {
 		X int
 		Y int
 	}
-	Start time.Time 
+	StartTime time.Time 
 }
 
 func NewGame(body io.ReadCloser, players []string) (*Game, error) {
@@ -58,9 +58,9 @@ func NewGame(body io.ReadCloser, players []string) (*Game, error) {
 		Begin:   v.Begin,
 		Players: make(map[string]*Player),
 	}
-	x, y := v.Begin.Y, v.Begin.X
+	// x, y := v.Begin.Y, v.Begin.X
 	for _, player := range players {
-		game.Players[player] = NewPlayer(x, y, player, game)
+		game.Players[player] = NewPlayer(v.Exit.Y, v.Exit.X, player, game)
 	}
 	return game, nil
 }
@@ -161,7 +161,7 @@ type GameRunner struct {
 }
 
 func (g *GameRunner) Run() {
-	g.Start = time.Now()
+	g.StartTime = time.Now()
 	for _, f := range g.GetStatus() {
 		g.broadcast <- f
 	}

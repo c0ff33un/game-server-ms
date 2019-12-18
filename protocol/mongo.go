@@ -56,7 +56,7 @@ func AddRoom(room *Room) {
 	}
 	log.Println("Finished adding room to database")
 
-	cursor, err := rooms.Find(context.TODO(), bson.D{})
+	/*cursor, err := rooms.Find(context.TODO(), bson.D{})
 	if err != nil {
 		log.Println(err)
 	}
@@ -66,5 +66,5 @@ func AddRoom(room *Room) {
 	}
 	for _, result := range results {
 		log.Println(result)
-	}
+	}*/
 }
