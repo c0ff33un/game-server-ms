@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"time"
 )
 
 type Board struct {
@@ -37,6 +38,7 @@ type Game struct {
 		X int
 		Y int
 	}
+	StartTime time.Time 
 }
 
 func NewGame(body io.ReadCloser, players []string) (*Game, error) {
@@ -56,9 +58,9 @@ func NewGame(body io.ReadCloser, players []string) (*Game, error) {
 		Begin:   v.Begin,
 		Players: make(map[string]*Player),
 	}
-	x, y := v.Begin.Y, v.Begin.X
+	// x, y := v.Begin.Y, v.Begin.X
 	for _, player := range players {
-		game.Players[player] = NewPlayer(x, y, player, game)
+		game.Players[player] = NewPlayer(v.Exit.Y, v.Exit.X, player, game)
 	}
 	return game, nil
 }
@@ -128,7 +130,7 @@ func (s *ClassicSimulator) simulateGame(g *Game, m interface{}) []interface{} {
 			res = append(res, move)
 			if x == g.Exit.Y && y == g.Exit.X {
 				log.Println("User", id, "won")
-				res = append(res, player.getWinMessage())
+				res = append(res, player.getWinMessage(g.StartTime))
 			}
 		}
 	}
@@ -159,6 +161,7 @@ type GameRunner struct {
 }
 
 func (g *GameRunner) Run() {
+	g.StartTime = time.Now()
 	for _, f := range g.GetStatus() {
 		g.broadcast <- f
 	}
@@ -168,6 +171,7 @@ func (g *GameRunner) Run() {
 		case <-g.Quit:
 			return
 		case message := <-g.Update:
+
 			result := g.simulateGame(g.Game, message)
 			for _, message := range result {
 				g.broadcast <- message

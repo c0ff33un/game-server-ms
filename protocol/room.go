@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	//"github.com/segmentio/ksuid"
 	"github.com/coff33un/game-server-ms/game"
+	//"github.com/segmentio/ksuid"
 )
 
 type Room struct {
@@ -46,13 +46,14 @@ func genId() string {
 		baseRoom = baseRoom + v
 	}
 	return strconv.Itoa(baseRoom + rand.Intn(9999))
+	//return ksuid.New().String()
 }
 
 func NewRoom(h *Hub) *Room {
 	id := genId()
-	for h.Byid[id] != nil {
-		id = genId()
-	}
+	// for h.Byid[id] != nil {
+	// 	id = genId()
+	// }
 	log.Println("New RoomID:", id)
 	room := &Room{
 		ID:         id,
@@ -75,16 +76,16 @@ type IdResponse struct {
 }
 
 func (r *Room) writeMatch(message game.WinMessage) error {
+	log.Printf("Message: %v\n", message)
 	client := graphql.NewClient(os.Getenv("GRAPHQL_URL"))
 	req := graphql.NewRequest(`
-		mutation {
-			newMatch (winner: $winner, players: $players){ 
+		mutation ($winner: String, $players: [String], $time: Int){
+			newMatch(winner: $winner, players: $players, resolveTime: $time){ 
 				id
 			}
 		}
 	`)
-	req.Var("winner", message.Id)
-	players := "["
+	players := ""
 	first := true
 	for id := range r.byid {
 		if first {
@@ -94,12 +95,16 @@ func (r *Room) writeMatch(message game.WinMessage) error {
 		}
 		players = players + "," + id
 	}
-	players = players + "]"
 	req.Var("players", players)
+	req.Var("time", message.ResolveTime)
+	req.Var("winner", message.Id)
 	//req.Header.Set("Accept", "application/json")
 	ctx := context.TODO()
 	respData := IdResponse{}
 	err := client.Run(ctx, req, &respData)
+	if err != nil {
+		log.Println(err)
+	}
 	return err
 }
 

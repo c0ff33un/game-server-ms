@@ -50,10 +50,10 @@ func AddRoom(room *Room) error {
 	log.Println("Adding room to database")
 	res, err := rooms.InsertOne(context.TODO(), room)
 	if err != nil {
-		log.Println(err)
 		return err
 	}
 	id := res.InsertedID
 	log.Printf("Inserted Id %v\n", id)
 	log.Println("Finished adding room to database")
+	return nil
 }

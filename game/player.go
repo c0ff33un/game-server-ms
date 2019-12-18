@@ -2,6 +2,7 @@ package game
 
 import (
 //"fmt"
+	"time"
 )
 
 type Player struct {
@@ -49,10 +50,14 @@ func (p *Player) getMoveMessage() MoveMessage {
 type WinMessage struct {
 	PlayerMessage
 	Handle string `json:"handle"`
+	ResolveTime int64 
 }
 
-func (p *Player) getWinMessage() WinMessage {
-	return WinMessage{PlayerMessage: p.getPlayerMessage("win")}
+func (p *Player) getWinMessage(startTime time.Time) WinMessage {
+	return WinMessage{
+		PlayerMessage: p.getPlayerMessage("win"), 
+		ResolveTime: time.Since(startTime).Milliseconds(),
+	}
 }
 
 func (p *Player) move(direction string) MoveMessage {

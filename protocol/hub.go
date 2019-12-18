@@ -134,6 +134,7 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
 		log.Println("Room Setup")
 		err = room.SetupGame(r.Body)
 		if err != nil {
+			log.Printf("Database error %v\n", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -203,7 +204,11 @@ func (hub *Hub) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		log.Println("Created room")
 		go room.Run()
 		log.Println("room Run running")
-		AddRoom(room)
+		err = AddRoom(room)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(js)
 	}
