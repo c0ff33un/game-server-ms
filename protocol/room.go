@@ -40,7 +40,12 @@ type Room struct {
 }
 
 func genId() string {
-	return strconv.Itoa(rand.Intn(10000))
+	baseRoom := 1
+	if baseRoomStr := os.Getenv("BASE_ROOM"); baseRoomStr != "" {
+		v, _ := strconv.Atoi(baseRoomStr)
+		baseRoom = baseRoom + v
+	}
+	return strconv.Itoa(baseRoom + rand.Intn(9999))
 }
 
 func NewRoom(h *Hub) *Room {

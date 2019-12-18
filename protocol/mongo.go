@@ -55,16 +55,4 @@ func AddRoom(room *Room) {
 		log.Println(err)
 	}
 	log.Println("Finished adding room to database")
-
-	cursor, err := rooms.Find(context.TODO(), bson.D{})
-	if err != nil {
-		log.Println(err)
-	}
-	var results []bson.M
-	if err = cursor.All(context.TODO(), &results); err != nil {
-		log.Println(err)
-	}
-	for _, result := range results {
-		log.Println(result)
-	}
 }

@@ -5,7 +5,6 @@
 package main
 
 import (
-	"flag"
 	"log"
 
 	"github.com/coff33un/game-server-ms/protocol"
@@ -14,13 +13,11 @@ import (
 //var addr = flag.String("addr", ":8080", "http service address")
 var hub *protocol.Hub
 
-// ruta para crear room, retorna el id (PseudoRandom) del room creado el room funciona como go rutina
-
 func main() {
-	flag.Parse()
 	hub = protocol.NewHub()
 	go hub.Run()
 	err := routes()
+	log.Println("Routes set up")
 	if err != nil {
 		log.Println(err)
 		return
