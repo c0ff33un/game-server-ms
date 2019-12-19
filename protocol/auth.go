@@ -2,30 +2,37 @@ package protocol
 
 import (
 	"context"
+	"log"
 	"os"
 
 	"github.com/machinebox/graphql"
 )
 
 type Response struct {
-	User struct {
-		Id     int
+	Me struct {
+		Id     string
 		Handle string
 		Email  string
 	}
 }
 
 func GetUser(token string) (Response, error) {
-	client := graphql.NewClient(os.Getenv("GRAPHQL_URL"))
+	url := os.Getenv("GRAPHQL_URL")
+	if url == "" {
+		panic("please provide a graphql url")
+	}
+	log.Printf("Graphql url: %v", url)
+	client := graphql.NewClient(url)
 	req := graphql.NewRequest(`
 		query {
-			user { 
+			me { 
 				id
 				handle
 				email
 			}
 		}
 	`)
+	log.Printf("token: %v", token)
 	req.Header.Set("Authorization", "Bearer "+token)
 	//req.Header.Set("Accept", "application/json")
 	ctx := context.TODO()

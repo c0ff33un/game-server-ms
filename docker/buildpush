@@ -1,0 +1,2 @@
+docker build -t taurusgame/game-server-ms -f Dockerfile.multistage ../
+docker push taurusgame/game-server-ms

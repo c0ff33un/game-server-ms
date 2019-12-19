@@ -5,7 +5,9 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/coff33un/game-server-ms/protocol"
 )
@@ -14,10 +16,13 @@ import (
 var hub *protocol.Hub
 
 func main() {
+	if os.Getenv("NO_LOGS") != "" {
+		log.SetFlags(0)
+		log.SetOutput(ioutil.Discard)
+	}
 	hub = protocol.NewHub()
 	go hub.Run()
 	err := routes()
-	log.Println("Routes set up")
 	if err != nil {
 		log.Println(err)
 		return

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -26,16 +26,16 @@ type Hub struct {
 	Rooms map[*Room]bool
 	Byid  map[string]*Room
 
-	// Registers new rooms.
-	register chan *Room
-	// Unregister rooms.
-	unregister chan *Room
+	register   chan *Room // Registers new rooms.
+	unregister chan *Room // Unregister rooms.
+	rands      chan int   // Concurrent random generation
 }
 
 func NewHub() *Hub {
 	return &Hub{
 		register:   make(chan *Room),
 		unregister: make(chan *Room),
+		rands:      make(chan int),
 		Rooms:      make(map[*Room]bool),
 		Byid:       make(map[string]*Room),
 	}
@@ -67,6 +67,7 @@ func (h *Hub) getRoom404(w http.ResponseWriter, r *http.Request) (*Room, error) 
 	roomid := vars["roomid"]
 	room, err := h.getRoom(roomid)
 	if err != nil {
+		log.Printf("get room error: %v", err)
 		http.NotFound(w, r)
 		return nil, err
 	}
@@ -124,10 +125,10 @@ func (h *Hub) SetupRoom(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		room, err := h.getRoom404(w, r)
 		if err != nil {
-			log.Println(err)
 			return
 		}
 		if room.Running {
+			http.Error(w, "Cannot Setup Running room", http.StatusConflict)
 			log.Println("Cannot Setup Running Room")
 			return
 		}
@@ -152,10 +153,10 @@ func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		room, err := h.getRoom404(w, r)
 		if err != nil {
-			log.Println(err)
 			return
 		}
 		if room.Running {
+			http.Error(w, "Room already running", http.StatusConflict)
 			log.Println("Room already Running")
 			return
 		}
@@ -165,7 +166,6 @@ func (h *Hub) StartRoom(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"id": room.ID})
 	}
@@ -206,6 +206,7 @@ func (hub *Hub) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		log.Println("room Run running")
 		err = AddRoom(room)
 		if err != nil {
+			log.Printf("Database error: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -232,8 +233,8 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
 		log.Println("shit", err)
 		return
 	}
-	id = strconv.Itoa(f.User.Id)
-	handle = f.User.Handle
+	id = f.Me.Id
+	handle = f.Me.Handle
 
 	log.Printf("The id is: %v, the handle is: %v\n", id, handle)
 
@@ -252,9 +253,16 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
 	log.Println("ServeWS: Registered new client to room")
 }
 
-func (h *Hub) Run() {
+func (h *Hub) RunRands() {
 	for {
-		log.Println("Hub run here")
+		h.rands <- rand.Intn(9999)
+	}
+}
+
+func (h *Hub) Run() {
+	log.Println("Hub running...")
+	go h.RunRands()
+	for {
 		select {
 		case room := <-h.register:
 			h.Rooms[room] = true

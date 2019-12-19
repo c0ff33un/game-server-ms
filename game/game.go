@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"os"
 	"time"
 )
 
@@ -13,18 +14,17 @@ type Board struct {
 	Grid []bool // wall or not
 }
 
+type Pos struct {
+	X int
+	Y int
+}
+
 type SetupGameMessage struct {
-	Rows int
-	Cols int
-	Grid []bool
-	Exit struct {
-		X int
-		Y int
-	}
-	Begin struct {
-		X int
-		Y int
-	}
+	Rows  int
+	Cols  int
+	Grid  []bool
+	Exit  Pos
+	Begin Pos
 }
 
 type Game struct {
@@ -38,7 +38,7 @@ type Game struct {
 		X int
 		Y int
 	}
-	StartTime time.Time 
+	StartTime time.Time
 }
 
 func NewGame(body io.ReadCloser, players []string) (*Game, error) {
@@ -59,8 +59,12 @@ func NewGame(body io.ReadCloser, players []string) (*Game, error) {
 		Players: make(map[string]*Player),
 	}
 	// x, y := v.Begin.Y, v.Begin.X
+	var Begin Pos = v.Begin
+	if os.Getenv("DEBUG") != "" {
+		Begin = v.Exit
+	}
 	for _, player := range players {
-		game.Players[player] = NewPlayer(v.Exit.Y, v.Exit.X, player, game)
+		game.Players[player] = NewPlayer(Begin.Y, Begin.X, player, game)
 	}
 	return game, nil
 }
@@ -166,7 +170,6 @@ func (g *GameRunner) Run() {
 		g.broadcast <- f
 	}
 	for {
-		log.Println("Game Run here..")
 		select {
 		case <-g.Quit:
 			return

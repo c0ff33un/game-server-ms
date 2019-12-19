@@ -6,7 +6,6 @@ import (
 	"github.com/machinebox/graphql"
 	"io"
 	"log"
-	"math/rand"
 	"os"
 	"strconv"
 	"sync"
@@ -39,18 +38,18 @@ type Room struct {
 	sync.WaitGroup `bson:"-"`
 }
 
-func genId() string {
+func genId(rand int) string {
 	baseRoom := 1
 	if baseRoomStr := os.Getenv("BASE_ROOM"); baseRoomStr != "" {
 		v, _ := strconv.Atoi(baseRoomStr)
 		baseRoom = baseRoom + v
 	}
-	return strconv.Itoa(baseRoom + rand.Intn(9999))
+	return strconv.Itoa(baseRoom + rand)
 	//return ksuid.New().String()
 }
 
 func NewRoom(h *Hub) *Room {
-	id := genId()
+	id := genId(<-h.rands)
 	// for h.Byid[id] != nil {
 	// 	id = genId()
 	// }
@@ -231,7 +230,6 @@ func (r *Room) Run() {
 	}()
 	go r.cullInactive(15)
 	for {
-		log.Println("Room Run here..")
 		r.activity = time.Now()
 		select {
 		case <-r.quit:

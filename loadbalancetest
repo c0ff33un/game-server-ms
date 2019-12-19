@@ -1,0 +1,1 @@
+./test & PORT=8081 BASE_ROOM=10000 ./test

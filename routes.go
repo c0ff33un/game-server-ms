@@ -26,7 +26,7 @@ func routes() error {
 	s.HandleFunc("/room/{roomid}/setupready", hub.StartRoom)
 	s.HandleFunc("/room/{roomid}/ready", hub.RoomReady)
 	s.HandleFunc("/ws/{roomid}", hub.ServeWs)
-	err := http.ListenAndServe(getPort(), r)
 	log.Println("Routes set up")
+	err := http.ListenAndServe(getPort(), r)
 	return err
 }
